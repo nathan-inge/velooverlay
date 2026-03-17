@@ -2,6 +2,16 @@ import { WidgetDefinition, WidgetRenderContext } from '@velooverlay/widget-sdk';
 
 export interface SnakeMapConfig {
   padding: number; // pixels of padding inside the widget
+  /**
+   * When true, the ghost route and bounding box are derived from the full
+   * activity (ctx.route), even if the video only covers a portion of the ride.
+   * When false (default), only the video-aligned route data is used.
+   *
+   * In the GUI, ctx.route always contains the full activity, so this option
+   * is effectively always true. It is meaningful primarily for the CLI renderer,
+   * which must be explicitly provided with the full-activity GPS track.
+   */
+  fullTrack: boolean;
 }
 
 export const SnakeMapWidget: WidgetDefinition<SnakeMapConfig> = {
@@ -10,7 +20,7 @@ export const SnakeMapWidget: WidgetDefinition<SnakeMapConfig> = {
   version: '1.0.0',
   defaultSize: { width: 300, height: 300 },
 
-  getDefaultConfig: () => ({ padding: 12 }),
+  getDefaultConfig: () => ({ padding: 12, fullTrack: false }),
 
   render(ctx: WidgetRenderContext, config: SnakeMapConfig): void {
     const { canvas, frame, route, theme, width, height } = ctx;

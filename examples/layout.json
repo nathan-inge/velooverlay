@@ -49,7 +49,8 @@
       "config": {
         "track_color": "#FFFFFF",
         "ghost_color": "#888888",
-        "head_color": "#FF3B30"
+        "head_color": "#FF3B30",
+        "full_track": true
       }
     }
   ]

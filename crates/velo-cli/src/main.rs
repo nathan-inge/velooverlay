@@ -3,11 +3,15 @@ mod video_meta;
 
 use anyhow::{anyhow, Context, Result};
 use clap::{Parser, Subcommand};
+use std::io::Write as IoWrite;
 use std::path::PathBuf;
+use std::process::Stdio;
 use velo_core::interpolation::LinearInterpolation;
 use velo_core::parser::ParserRegistry;
 use velo_core::pipeline::Pipeline;
 use velo_core::render::layout::Layout;
+use widgets_builtin::font::load_system_font;
+use widgets_builtin::renderer::CliRenderer;
 use velo_core::sync::{ManualSyncStrategy, TimestampSyncStrategy, VideoMetadata};
 
 // ---------------------------------------------------------------------------
@@ -101,6 +105,12 @@ struct RenderArgs {
     /// Output resolution
     #[arg(long, default_value = "1080p", value_parser = ["1080p", "720p"])]
     resolution: String,
+
+    /// H.264 Constant Rate Factor (0–51). Lower = better quality and larger file.
+    /// Default 23 matches FFmpeg's built-in default. Try 28 to reduce file size,
+    /// or 18 for near-lossless output.
+    #[arg(long, default_value = "23", value_name = "CRF")]
+    crf: u8,
 }
 
 // ---------------------------------------------------------------------------
@@ -211,55 +221,115 @@ fn run_render(args: RenderArgs) -> Result<()> {
         Box::new(LinearInterpolation),
     );
 
+    // Parse the full telemetry session to extract all GPS points.
+    // This is used by the snake-map widget when `"full_track": true` is set —
+    // the video may only cover part of the ride, but the map should show the
+    // whole route. We parse once here so the pipeline can run separately.
+    println!("Parsing telemetry (full track): {}", args.telemetry.display());
+    let full_track_points: Vec<(f64, f64)> = {
+        let registry = ParserRegistry::default();
+        match registry.parse(&args.telemetry) {
+            Ok(session) => session
+                .points
+                .iter()
+                .filter_map(|p| Some((p.lat?, p.lon?)))
+                .collect(),
+            Err(e) => {
+                eprintln!("Warning: could not parse telemetry for full track: {e}");
+                vec![]
+            }
+        }
+    };
+    println!("  {} GPS points in full activity", full_track_points.len());
+
     println!("Processing: {}", args.telemetry.display());
     let frames = pipeline
         .process(&args.telemetry, &video_meta)
         .map_err(|e| anyhow!("{e}"))?;
     println!("Produced {} frames", frames.len());
 
-    // Write the ASS subtitle file to a temp location.
-    let ass_path = args.output.with_extension("ass");
-    println!("Generating overlay: {}", ass_path.display());
-    overlay::write_ass(&frames, &layout, &ass_path)?;
-
-    // Determine output resolution.
-    let scale_filter = match args.resolution.as_str() {
-        "720p" => Some("scale=1280:720,"),
-        _ => None, // 1080p: keep source resolution
+    // Overlay resolution matches the target output resolution.
+    let (overlay_w, overlay_h) = match args.resolution.as_str() {
+        "720p" => (1280u32, 720u32),
+        _ => (1920u32, 1080u32),
     };
 
-    // Build the FFmpeg filter chain.
-    // The `subtitles` filter burns the .ass file into the video stream.
-    let subtitle_filter = format!(
-        "{}subtitles={}",
-        scale_filter.unwrap_or(""),
-        ass_path.to_string_lossy()
-    );
+    println!("Loading font...");
+    let font = load_system_font();
 
-    println!("Rendering with FFmpeg...");
-    let status = std::process::Command::new("ffmpeg")
+    let renderer = CliRenderer::new(overlay_w, overlay_h, font, full_track_points);
+
+    // Build the FFmpeg filter graph.
+    //
+    // Two inputs:
+    //   [0:v]  — source video file
+    //   [1:v]  — raw RGBA overlay frames read from stdin
+    //
+    // For 720p output we scale the source video before compositing so both
+    // streams are the same resolution.
+    let filter_complex = match args.resolution.as_str() {
+        "720p" => "[0:v]scale=1280:720[scaled];[scaled][1:v]overlay=0:0".to_string(),
+        _ => "[0:v][1:v]overlay=0:0".to_string(),
+    };
+
+    println!("Rendering with FFmpeg (piping {} frames)...", frames.len());
+
+    let mut ffmpeg = std::process::Command::new("ffmpeg")
         .args([
+            "-y",
+            // Input 0: source video
             "-i",
             args.video.to_str().unwrap_or(""),
-            "-vf",
-            &subtitle_filter,
+            // Input 1: raw RGBA overlay from stdin
+            "-f",
+            "rawvideo",
+            "-pix_fmt",
+            "rgba",
+            "-s",
+            &format!("{}x{}", overlay_w, overlay_h),
+            "-framerate",
+            &format!("{:.6}", video_meta.frame_rate),
+            "-i",
+            "pipe:0",
+            // Composite filter
+            "-filter_complex",
+            &filter_complex,
+            "-c:v",
+            "libx264",
+            "-crf",
+            &args.crf.to_string(),
             "-c:a",
-            "copy", // pass audio through untouched
-            "-y",   // overwrite output without asking
+            "copy",
             args.output.to_str().unwrap_or(""),
         ])
-        .status()
+        .stdin(Stdio::piped())
+        .spawn()
         .context("Failed to launch FFmpeg")?;
 
+    {
+        let stdin = ffmpeg.stdin.as_mut().expect("FFmpeg stdin not piped");
+        let total = frames.len();
+
+        for (i, frame) in frames.iter().enumerate() {
+            let rgba = renderer.render_frame(frame, &frames, &layout);
+            stdin
+                .write_all(&rgba)
+                .context("Failed to write overlay frame to FFmpeg")?;
+
+            if i % 150 == 0 || i + 1 == total {
+                println!("  Frame {}/{}", i + 1, total);
+            }
+        }
+        // stdin is dropped here → FFmpeg sees EOF on its overlay input.
+    }
+
+    let status = ffmpeg.wait().context("Failed to wait for FFmpeg")?;
     if !status.success() {
         return Err(anyhow!(
             "FFmpeg exited with status {}",
             status.code().unwrap_or(-1)
         ));
     }
-
-    // Clean up the temporary ASS file.
-    let _ = std::fs::remove_file(&ass_path);
 
     println!("Done: {}", args.output.display());
     Ok(())

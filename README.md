@@ -143,7 +143,24 @@ cargo run --package velooverlay -- render \
   --sync manual \
   --offset-ms -5200 \
   --output output.mp4
+
+# Reduce output file size (higher CRF = smaller file, lower quality)
+cargo run --package velooverlay -- render \
+  --video ride.mp4 \
+  --telemetry ride.fit \
+  --layout layout.json \
+  --crf 28 \
+  --output output.mp4
 ```
+
+**Output file size:** The render command re-encodes the video stream (unavoidable when compositing). The default `--crf 23` matches FFmpeg's built-in default and may produce a larger file than your source if the original was recorded in H.265 or at a lower bitrate. Use `--crf 28` for a noticeably smaller file at slightly lower quality, or `--crf 18` for near-lossless output.
+
+| `--crf` | Quality | Typical use |
+|---|---|---|
+| 18 | Near-lossless | Archiving, further editing |
+| 23 | Default (good) | General sharing |
+| 28 | Smaller file | Web upload, messaging |
+| 35+ | Noticeably degraded | Not recommended |
 
 ### Layout file
 
@@ -157,7 +174,7 @@ Widget types available in Phase 0:
 | `builtin:heart-rate` | Heart rate in BPM |
 | `builtin:cadence` | Cadence in RPM |
 | `builtin:power` | Power in Watts |
-| `builtin:snake-map` | GPS route map (skipped in CLI render — GUI only for now) |
+| `builtin:snake-map` | GPS route map. Config: `"full_track": true` to show the entire activity even if the video is a clip |
 
 ---
 

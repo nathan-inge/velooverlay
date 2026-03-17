@@ -20,5 +20,3 @@ fitparser = "0.6"
 # GPX file parsing (.gpx files)
 gpx = "0.10"
 
-# 2D raster graphics for CLI widget rendering (no GPU/browser required)
-tiny-skia = "0.11"

@@ -13,7 +13,8 @@ name = "velooverlay"
 path = "src/main.rs"
 
 [dependencies]
-velo-core  = { path = "../velo-core" }
+velo-core       = { path = "../velo-core" }
+widgets-builtin = { path = "../widgets-builtin" }
 serde      = { workspace = true }
 serde_json = { workspace = true }
 chrono     = { workspace = true }
