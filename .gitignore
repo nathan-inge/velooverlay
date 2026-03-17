@@ -1,0 +1,32 @@
+# Rust / Cargo
+target/
+Cargo.lock   # Not ignored for binaries, but this is a workspace with both libs and bins.
+             # Convention: commit Cargo.lock for applications, ignore for libraries.
+             # We commit it here since velo-cli is a deployable binary.
+
+# Node / npm
+node_modules/
+dist/
+.turbo/
+
+# Tauri
+app/src-tauri/target/
+app/src-tauri/WixTools/
+
+# macOS
+.DS_Store
+*.DS_Store
+
+# Editor
+.idea/
+.vscode/settings.json
+*.swp
+*.swo
+
+# Environment
+.env
+.env.local
+
+# Test output / fixtures (large video files should never be committed)
+tests/fixtures/*.mp4
+tests/fixtures/*.mov

@@ -1,0 +1,20 @@
+{
+  "name": "@velooverlay/widgets-builtin",
+  "version": "0.1.0",
+  "description": "Built-in widgets for VeloOverlay",
+  "license": "MIT",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "files": ["dist"],
+  "scripts": {
+    "build": "tsc",
+    "typecheck": "tsc --noEmit",
+    "dev": "tsc --watch"
+  },
+  "dependencies": {
+    "@velooverlay/widget-sdk": "*"
+  },
+  "devDependencies": {
+    "typescript": "^5.4.0"
+  }
+}

@@ -1,0 +1,16 @@
+{
+  "name": "velooverlay-monorepo",
+  "private": true,
+  "workspaces": [
+    "packages/*",
+    "app"
+  ],
+  "scripts": {
+    "build": "npm run build --workspaces --if-present",
+    "typecheck": "npm run typecheck --workspaces --if-present",
+    "dev": "npm run dev --workspace=app"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}

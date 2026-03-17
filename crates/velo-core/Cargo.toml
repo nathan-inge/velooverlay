@@ -1,0 +1,24 @@
+[package]
+name        = "velo-core"
+description = "Core telemetry parsing, sync, and interpolation pipeline for VeloOverlay"
+# Inherit shared metadata from the workspace root
+version.workspace     = true
+edition.workspace     = true
+license.workspace     = true
+repository.workspace  = true
+authors.workspace     = true
+
+[dependencies]
+serde      = { workspace = true }
+serde_json = { workspace = true }
+chrono     = { workspace = true }
+thiserror  = { workspace = true }
+
+# FIT file parsing (.fit files from Garmin/Wahoo devices)
+fitparser = "0.6"
+
+# GPX file parsing (.gpx files)
+gpx = "0.10"
+
+# 2D raster graphics for CLI widget rendering (no GPU/browser required)
+tiny-skia = "0.11"

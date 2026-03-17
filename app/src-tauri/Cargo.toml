@@ -1,0 +1,29 @@
+[package]
+name        = "velo-app"
+description = "Tauri desktop application for VeloOverlay"
+version.workspace    = true
+edition.workspace    = true
+license.workspace    = true
+repository.workspace = true
+authors.workspace    = true
+
+# Tauri requires both a lib and a bin target.
+# The lib target is used on mobile platforms and for testing.
+# The bin target is the desktop executable.
+[lib]
+name       = "velo_app_lib"
+crate-type = ["lib", "cdylib", "staticlib"]
+
+[[bin]]
+name = "velo-app"
+path = "src/main.rs"
+
+[build-dependencies]
+tauri-build = { version = "2", features = [] }
+
+[dependencies]
+velo-core  = { path = "../../crates/velo-core" }
+tauri      = { version = "2", features = [] }
+serde      = { workspace = true }
+serde_json = { workspace = true }
+anyhow     = { workspace = true }

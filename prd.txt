@@ -1,0 +1,137 @@
+Product Requirement Document: VeloOverlay (v1.0)
+Project Name: VeloOverlay
+License: MIT
+Status: Draft / Phase 1 Planning
+Date: March 17, 2026
+Objective: A high-performance, open source software suite for synchronizing and overlaying cycling telemetry (GPS, HR, Power, Cadence) onto POV video with a customizable, extensible widget system and real-time reactive rendering.
+
+1. Executive Summary
+VeloOverlay bridges the gap between raw action camera footage (GoPro, Insta360) and cycling computer data (Garmin, Wahoo). It provides a WYSIWYG editor for users to design their own data "dashboards" and burn them into video for social sharing or professional analysis.
+
+The project is fully open source (MIT license) and designed from the ground up for extensibility: the sync engine, interpolation pipeline, and widget system are all built as pluggable interfaces. A widget marketplace allows community members to build and share custom widgets.
+
+Development follows a two-phase UI approach:
+  Phase 0: CLI tool for validating and iterating on the core data pipeline.
+  Phase 1+: Cross-platform desktop GUI (macOS-first, Windows on roadmap).
+
+2. Functional Requirements
+
+2.1 Data Ingestion & Processing
+* Telemetry Support: Must parse .FIT, .GPX, and .TCX files.
+* Video Support: Must support .MP4 and .MOV (H.264/H.265).
+* Clock Alignment:
+    * Primary: Extract "Start Time" from video metadata and GPS file header for auto-sync.
+    * Fallback: Manual offset provided by the user (e.g., --offset 5.2s or UI slider).
+    * Architecture: Sync strategy must be implemented as a pluggable interface to support future heuristics (e.g., speed-curve matching, audio-beep detection, video motion analysis).
+* Interpolation:
+    * Upsample telemetry from 1Hz (standard GPS) to target frame rate (30/60fps).
+    * Default strategy: Linear Interpolation.
+    * Architecture: Interpolation must be implemented as a pluggable strategy interface to support future algorithms (e.g., cubic spline, Kalman filter).
+* Data Gaps: When GPS signal is lost, widgets must degrade gracefully (show "Signal Lost" indicator or fade out).
+
+2.2 Widget System
+* Plugin Architecture: Widgets are defined via a stable SDK interface. Third-party developers can implement and distribute custom widgets.
+* Marketplace: A community registry (initially a curated GitHub-based list) for discovering and installing community widgets.
+* Widget Interaction (GUI): Click-and-drag movement, corner-handle scaling, Snap-to-Grid (10px increments).
+* Global Styles: A master "Theme" (font, primary color, etc.) applied across all widgets, overridable per-widget.
+
+2.3 Widget Library (Phase 1 Built-ins)
+* Digital Speedometer: Toggleable between MPH and KPH.
+* Snake Map:
+    * Bounding box approach: calculate Min/Max Lat/Long of entire ride, map to widget pixel dimensions.
+    * Full route always visible.
+    * Future (unridden) portion displayed as a faint ghost line.
+    * Ridden portion displayed as a solid line.
+    * Current position shown as a bright "Head" marker.
+* Metric Tiles: Individual display boxes for:
+    * Heart Rate (BPM)
+    * Cadence (RPM)
+    * Power (Watts)
+
+2.4 The "Stage" (Editor UI — Phase 1 GUI)
+* Canvas Overlay: A rendering layer (WebGL or equivalent) sitting atop a video player.
+* Widget Interaction: Click-and-drag, corner-handle scaling, Snap-to-Grid.
+* Global Styles: Master theme toggle with per-widget overrides.
+
+3. Phased Delivery Roadmap
+
+Phase 0: CLI (Data Pipeline Validation)
+* Goal: A headless command-line tool to validate the core data pipeline before building any GUI.
+* Commands:
+    * process: Parse telemetry file, apply sync offset, interpolate to target FPS, and export as JSON or CSV.
+    * render: Take a processed telemetry file + video + layout config and burn the overlay via FFmpeg.
+* Features:
+    * FIT/GPX/TCX parsing.
+    * Manual sync offset (--offset flag).
+    * Linear interpolation (pluggable strategy).
+    * FFmpeg as external dependency (clear error if not found on PATH).
+    * Fixed 1080p/30fps output for render command.
+* Platform: macOS (cross-platform by design, Windows untested).
+
+Phase 1: Foundation (Desktop GUI MVP)
+* Goal: A working "Sync & Burn" desktop application.
+* Platform: Cross-platform (macOS-first; Windows on roadmap). No Electron — framework TBD in technical design.
+* Features:
+    * Single Video + Single FIT/GPX file import.
+    * Manual Sync Slider (offset data by +/- milliseconds).
+    * Phase 1 widget library (Speedo, Snake Map, HR, Cadence, Power tiles).
+    * Widget SDK and marketplace integration.
+    * FFmpeg Export: 1080p/30fps fixed output.
+
+Phase 2: The Studio (Advanced UI)
+* Goal: Real-time customization and professional aesthetics.
+* Features:
+    * Real-time Preview: Gauge movement visible while scrubbing the timeline.
+    * Widget Inspector: Edit colors, opacity, and borders per-widget.
+    * Elevation Profile widget: Scrolling graph showing rider's position on a climb.
+    * Presets: "Save Layout" for reuse across future videos.
+
+Phase 3: Pro Creator (Performance & Advanced Sync)
+* Goal: High-end production features.
+* Features:
+    * 4K/60fps Support: GPU-accelerated rendering (NVENC/ProRes).
+    * Intelligent Auto-Sync: Speed-curve matching and/or audio-beep detection to automatically align telemetry with video.
+    * Map Tiles: Integration with MapBox/OpenStreetMap for satellite background overlays on the Snake Map.
+    * Transparent Export: Export widget layer as .MOV with alpha channel.
+
+4. Technical Architecture (High-Level — to be detailed in Technical Design Document)
+
+Component           | Responsibility
+--------------------|---------------------------------------------------------------
+CLI Tool            | Phase 0 headless pipeline: parse, sync, interpolate, render
+Data Parser         | FIT/GPX/TCX → normalized internal telemetry model
+Sync Engine         | Pluggable interface for aligning telemetry to video timeline
+Interpolation Engine| Pluggable strategy for upsampling telemetry to frame rate
+Widget SDK          | Stable interface for built-in and community widgets
+Rendering Engine    | Frame-accurate widget rendering (WebGL or equivalent)
+Video Engine        | FFmpeg integration for final video encode (external dependency)
+Desktop GUI         | Cross-platform UI shell (framework TBD)
+
+5. User Experience (UX) Specifications
+
+5.1 The Synchronization Flow
+1. Import: User provides Video and telemetry file.
+2. First Guess: App attempts to align via embedded timestamps (if available).
+3. Fine-Tune: User finds a visual cue (e.g., first pedal stroke) and nudges the offset until Speedometer reads > 0.
+4. Lock: User locks sync to prevent accidental shifts.
+5. Future: Sync strategies (speed matching, audio analysis) can be plugged in without changing this flow.
+
+5.2 The Snake Map Logic
+* Calculate Min/Max Lat and Long of the entire ride to define a bounding box.
+* Map bounding box coordinates to the widget's pixel dimensions.
+* Render:
+    * Ghost line: full route at low opacity.
+    * Solid line: ridden portion at full opacity.
+    * Head marker: bright indicator at current GPS position.
+
+6. Constraints & Risks
+
+* CPU Load: Real-time rendering of high-res video + widgets may lag on older hardware.
+  Mitigation: Use low-res proxies during editing; only full-res encode on export.
+* Data Gaps: GPS signal loss under tree cover or in tunnels.
+  Mitigation: Widgets degrade gracefully with "Signal Lost" state.
+* File Size: Video files can be many GB; app must reference local file paths and never upload to a server.
+* FFmpeg Dependency: Users must install FFmpeg separately.
+  Mitigation: Detect on PATH at startup and provide clear installation instructions if missing.
+* Widget SDK Stability: Once the marketplace launches, breaking changes to the widget interface are costly.
+  Mitigation: Version the SDK interface from day one; treat it as a public API.

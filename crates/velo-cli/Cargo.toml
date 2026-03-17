@@ -1,0 +1,21 @@
+[package]
+name        = "velooverlay"
+description = "CLI tool for the VeloOverlay data pipeline"
+version.workspace    = true
+edition.workspace    = true
+license.workspace    = true
+repository.workspace = true
+authors.workspace    = true
+
+# This produces the `velooverlay` executable.
+[[bin]]
+name = "velooverlay"
+path = "src/main.rs"
+
+[dependencies]
+velo-core  = { path = "../velo-core" }
+serde_json = { workspace = true }
+anyhow     = { workspace = true }
+
+# clap: CLI argument parsing. "derive" feature enables the #[derive(Parser)] macros.
+clap = { version = "4", features = ["derive"] }
