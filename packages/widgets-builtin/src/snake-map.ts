@@ -1,6 +1,6 @@
 import { WidgetDefinition, WidgetRenderContext } from '@velooverlay/widget-sdk';
 
-export interface SnakeMapConfig {
+export interface SnakeMapConfig extends Record<string, unknown> {
   padding: number; // pixels of padding inside the widget
   /**
    * When true, the ghost route and bounding box are derived from the full

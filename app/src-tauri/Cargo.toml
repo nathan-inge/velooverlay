@@ -22,8 +22,11 @@ path = "src/main.rs"
 tauri-build = { version = "2", features = [] }
 
 [dependencies]
-velo-core  = { path = "../../crates/velo-core" }
-tauri      = { version = "2", features = [] }
+velo-core       = { path = "../../crates/velo-core" }
+widgets-builtin = { path = "../../crates/widgets-builtin" }
+tauri           = { version = "2", features = ["protocol-asset"] }
+tauri-plugin-dialog = "2"
 serde      = { workspace = true }
 serde_json = { workspace = true }
 anyhow     = { workspace = true }
+chrono     = { workspace = true }

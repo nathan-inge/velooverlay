@@ -1,14 +1,17 @@
 mod commands;
+mod render;
+mod video_meta;
 
-/// Entry point for the Tauri application.
-/// Called by main.rs on desktop and by the mobile entry point on iOS/Android (future).
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
+        .plugin(tauri_plugin_dialog::init())
         .invoke_handler(tauri::generate_handler![
             commands::check_ffmpeg,
             commands::get_video_metadata,
             commands::process_telemetry,
+            commands::compute_auto_sync,
+            commands::export_video,
         ])
         .run(tauri::generate_context!())
         .expect("error while running VeloOverlay");

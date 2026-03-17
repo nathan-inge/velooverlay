@@ -1,26 +1,35 @@
-import { invoke } from '@tauri-apps/api/core';
-import { useEffect, useState } from 'react';
+import { useEffect } from 'react';
+import './index.css';
+import { useStore } from './store/useStore';
+import { useDragDrop } from './hooks/useDragDrop';
+import Toolbar from './components/Toolbar';
+import WidgetPanel from './components/WidgetPanel';
+import Stage from './components/Stage/index';
 
 export default function App() {
-  const [ffmpegAvailable, setFfmpegAvailable] = useState<boolean | null>(null);
+  const init = useStore((s) => s.init);
+  const { isDragOver } = useDragDrop();
 
   useEffect(() => {
-    // Check for FFmpeg on startup via the Tauri IPC bridge.
-    invoke<boolean>('check_ffmpeg').then(setFfmpegAvailable);
-  }, []);
+    void init();
+  }, [init]);
 
   return (
-    <div style={{ fontFamily: 'system-ui', padding: 32, color: '#fff', background: '#111', minHeight: '100vh' }}>
-      <h1>VeloOverlay</h1>
-      <p style={{ color: '#aaa' }}>Phase 1 GUI — coming soon.</p>
-      {ffmpegAvailable === false && (
-        <div style={{ marginTop: 16, padding: 12, background: '#5a1a1a', borderRadius: 6 }}>
-          ⚠ FFmpeg not found. Install it with <code>brew install ffmpeg</code> to enable video rendering.
-        </div>
-      )}
-      {ffmpegAvailable === true && (
-        <div style={{ marginTop: 16, padding: 12, background: '#1a3a1a', borderRadius: 6 }}>
-          ✓ FFmpeg detected.
+    <div className="app">
+      <Toolbar />
+      <div className="app-body">
+        <WidgetPanel />
+        <Stage />
+      </div>
+
+      {/* Full-window drop overlay */}
+      {isDragOver && (
+        <div className="drop-overlay">
+          <div className="drop-overlay-inner">
+            <div className="drop-icon">⬇</div>
+            <strong>Drop to import</strong>
+            <span>Video (.mp4 / .mov) or Telemetry (.fit / .gpx / .tcx)</span>
+          </div>
         </div>
       )}
     </div>

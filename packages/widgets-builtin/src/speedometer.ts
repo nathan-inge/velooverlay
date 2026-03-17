@@ -1,6 +1,6 @@
 import { WidgetDefinition, WidgetRenderContext } from '@velooverlay/widget-sdk';
 
-export interface SpeedometerConfig {
+export interface SpeedometerConfig extends Record<string, unknown> {
   unit: 'mph' | 'kph';
 }
 
