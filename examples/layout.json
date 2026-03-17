@@ -1,0 +1,56 @@
+{
+  "schema_version": "1.0.0",
+  "theme": {
+    "font_family": "Arial",
+    "primary_color": "#FFFFFF",
+    "background_opacity": 0.55
+  },
+  "widgets": [
+    {
+      "id": "speedometer-1",
+      "type": "builtin:speedometer",
+      "version": "1.0.0",
+      "position": { "x": 60, "y": 900 },
+      "size": { "width": 200, "height": 100 },
+      "config": {
+        "unit": "kph"
+      }
+    },
+    {
+      "id": "heart-rate-1",
+      "type": "builtin:heart-rate",
+      "version": "1.0.0",
+      "position": { "x": 280, "y": 900 },
+      "size": { "width": 180, "height": 100 },
+      "config": {}
+    },
+    {
+      "id": "cadence-1",
+      "type": "builtin:cadence",
+      "version": "1.0.0",
+      "position": { "x": 480, "y": 900 },
+      "size": { "width": 180, "height": 100 },
+      "config": {}
+    },
+    {
+      "id": "power-1",
+      "type": "builtin:power",
+      "version": "1.0.0",
+      "position": { "x": 680, "y": 900 },
+      "size": { "width": 180, "height": 100 },
+      "config": {}
+    },
+    {
+      "id": "snake-map-1",
+      "type": "builtin:snake-map",
+      "version": "1.0.0",
+      "position": { "x": 1660, "y": 60 },
+      "size": { "width": 200, "height": 200 },
+      "config": {
+        "track_color": "#FFFFFF",
+        "ghost_color": "#888888",
+        "head_color": "#FF3B30"
+      }
+    }
+  ]
+}

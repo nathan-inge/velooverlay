@@ -5,7 +5,9 @@ use serde::{Deserialize, Serialize};
 use std::path::PathBuf;
 
 mod manual;
+mod timestamp;
 pub use manual::ManualSyncStrategy;
+pub use timestamp::TimestampSyncStrategy;
 
 /// Metadata extracted from a video file.
 #[derive(Debug, Clone, Serialize, Deserialize)]

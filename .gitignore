@@ -27,6 +27,7 @@ app/src-tauri/WixTools/
 .env
 .env.local
 
-# Test output / fixtures (large video files should never be committed)
+# Test output / fixtures (large files should never be committed)
 tests/fixtures/*.mp4
 tests/fixtures/*.mov
+tests/fixtures/*.fit

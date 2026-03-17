@@ -85,15 +85,41 @@ cargo build --package velooverlay
 cargo run --package velooverlay -- --help
 ```
 
+### Sync modes
+
+Both `process` and `render` support two sync modes, controlled by `--sync`:
+
+| Mode | Flag | Behaviour |
+|---|---|---|
+| **Auto** (default) | `--sync auto` | Reads the `creation_time` tag from the video file and the `start_time` from the telemetry file and computes the offset automatically. Requires both files to contain embedded timestamps (GoPro, DJI, and Garmin devices all do). Falls back to `--offset-ms 0` with a warning if either timestamp is missing. |
+| **Manual** | `--sync manual --offset-ms <MS>` | Uses a fixed millisecond offset you provide. Positive = telemetry starts after the video; negative = telemetry starts before the video (the typical case when the video is a clip from mid-ride). |
+
 ### Commands
 
-**process** — Parse telemetry, sync to video, interpolate, export as JSON or CSV:
+**process** — Parse telemetry, apply sync, interpolate to frame rate, export as JSON or CSV:
 
 ```bash
+# Auto-sync using embedded timestamps (recommended)
 cargo run --package velooverlay -- process \
   --telemetry ride.fit \
   --video ride.mp4 \
-  --offset-ms 5200 \
+  --fps 30 \
+  --format json \
+  --output telemetry.json
+
+# Manual offset — telemetry started 5.2 seconds before the video
+cargo run --package velooverlay -- process \
+  --telemetry ride.fit \
+  --video ride.mp4 \
+  --sync manual \
+  --offset-ms -5200 \
+  --fps 30 \
+  --format csv \
+  --output telemetry.csv
+
+# No video — uses telemetry duration, outputs the full session
+cargo run --package velooverlay -- process \
+  --telemetry ride.fit \
   --fps 30 \
   --format json \
   --output telemetry.json
@@ -102,13 +128,36 @@ cargo run --package velooverlay -- process \
 **render** — Burn widget overlay onto video (requires FFmpeg):
 
 ```bash
+# Auto-sync (recommended)
 cargo run --package velooverlay -- render \
   --video ride.mp4 \
   --telemetry ride.fit \
   --layout layout.json \
-  --offset-ms 5200 \
+  --output output.mp4
+
+# Manual offset
+cargo run --package velooverlay -- render \
+  --video ride.mp4 \
+  --telemetry ride.fit \
+  --layout layout.json \
+  --sync manual \
+  --offset-ms -5200 \
   --output output.mp4
 ```
+
+### Layout file
+
+The `--layout` argument points to a `layout.json` file that describes which widgets to show and where. See [`examples/layout.json`](examples/layout.json) for a full example.
+
+Widget types available in Phase 0:
+
+| Type | Description |
+|---|---|
+| `builtin:speedometer` | Current speed. Config: `"unit": "kph"` or `"mph"` |
+| `builtin:heart-rate` | Heart rate in BPM |
+| `builtin:cadence` | Cadence in RPM |
+| `builtin:power` | Power in Watts |
+| `builtin:snake-map` | GPS route map (skipped in CLI render — GUI only for now) |
 
 ---
 
