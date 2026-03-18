@@ -27,23 +27,31 @@ export const ElevationWidget: WidgetDefinition<ElevationConfig> = {
       ? (config.unit === 'ft' ? raw * 3.28084 : raw)
       : null;
 
-    // Label
-    c.fillStyle = 'rgba(255,255,255,0.6)';
-    c.font = `${height * 0.18}px ${theme.fontFamily}`;
-    c.textAlign = 'center';
-    c.textBaseline = 'top';
-    c.fillText('ELEVATION', width / 2, height * 0.08);
+    const valueStr = value !== null ? String(Math.round(value)) : '--';
+    const unitStr = config.unit;
+    const gap = height * 0.06;
 
-    // Value
-    c.fillStyle = value !== null ? theme.primaryColor : 'rgba(255,255,255,0.3)';
-    c.font = `bold ${height * 0.42}px ${theme.fontFamily}`;
+    const valueFontSize = height * 0.55;
+    const unitFontSize = height * 0.28;
+
     c.textBaseline = 'middle';
-    c.fillText(value !== null ? String(Math.round(value)) : '--', width / 2, height * 0.55);
+    c.textAlign = 'left';
 
-    // Unit
-    c.fillStyle = 'rgba(255,255,255,0.5)';
-    c.font = `${height * 0.16}px ${theme.fontFamily}`;
-    c.textBaseline = 'bottom';
-    c.fillText(config.unit, width / 2, height * 0.97);
+    c.font = `bold ${valueFontSize}px ${theme.fontFamily}`;
+    const valueWidth = c.measureText(valueStr).width;
+
+    c.font = `${unitFontSize}px ${theme.fontFamily}`;
+    const unitWidth = c.measureText(unitStr).width;
+
+    const startX = (width - valueWidth - gap - unitWidth) / 2;
+    const midY = height / 2;
+
+    c.font = `bold ${valueFontSize}px ${theme.fontFamily}`;
+    c.fillStyle = value !== null ? theme.primaryColor : 'rgba(255,255,255,0.3)';
+    c.fillText(valueStr, startX, midY);
+
+    c.font = `${unitFontSize}px ${theme.fontFamily}`;
+    c.fillStyle = theme.primaryColor;
+    c.fillText(unitStr, startX + valueWidth + gap, midY);
   },
 };

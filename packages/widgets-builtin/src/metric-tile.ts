@@ -42,7 +42,7 @@ export function makeMetricTileWidget(opts: {
       c.fillText(value !== null ? String(Math.round(value)) : '--', width / 2, height * 0.55);
 
       // Unit (bottom)
-      c.fillStyle = 'rgba(255,255,255,0.5)';
+      c.fillStyle = theme.primaryColor;
       c.font = `${height * 0.16}px ${theme.fontFamily}`;
       c.textBaseline = 'bottom';
       c.fillText(opts.unit, width / 2, height * 0.97);

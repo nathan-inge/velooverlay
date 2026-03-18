@@ -209,15 +209,20 @@ cargo run --package velooverlay -- render \
 
 The `--layout` argument points to a `layout.json` file that describes which widgets to show and where. See [`examples/layout.json`](examples/layout.json) for a full example.
 
-Widget types available in Phase 0:
+Built-in widget types (used in `layout.json` under each widget's `config` object):
 
-| Type | Description |
-|---|---|
-| `builtin:speedometer` | Current speed. Config: `"unit": "kph"` or `"mph"` |
-| `builtin:heart-rate` | Heart rate in BPM |
-| `builtin:cadence` | Cadence in RPM |
-| `builtin:power` | Power in Watts |
-| `builtin:snake-map` | GPS route map. Config: `"full_track": true` to show the entire activity even if the video is a clip |
+| Type | Config (JSON keys) | Rendered by CLI export (`velooverlay render` / GUI Export MP4)? |
+|---|---|---|
+| `builtin:speedometer` | `{"unit": "kph" \| "mph"}` (default: `kph`) | Yes |
+| `builtin:heart-rate` | `{}` (no options) | Yes |
+| `builtin:cadence` | `{}` (no options) | Yes |
+| `builtin:power` | `{}` (no options) | Yes |
+| `builtin:snake-map` | `{"full_track": true \| false}` (default: `false`) | Yes |
+| `builtin:elevation-profile` | `{"full_track": true \| false}` (default: `false`) | Yes |
+| `builtin:elevation` | `{"unit": "m" \| "ft"}` (GUI preview only; see note below) | No |
+| `builtin:gradient` | `{"windowM": number}` (GUI preview only; see note below) | No |
+
+Note: the GUI may expose additional per-widget options (for example, `padding`) that are not currently consumed by the Rust CLI renderer. If you’re preparing a `layout.json` for CLI export, prefer the keys listed above.
 
 ---
 

@@ -32,25 +32,32 @@ export const GradientWidget: WidgetDefinition<GradientConfig> = {
         ? null
         : computeGradient(route.points, frame, config.windowM);
 
-    // Label
-    c.fillStyle = 'rgba(255,255,255,0.6)';
-    c.font = `${height * 0.18}px ${theme.fontFamily}`;
-    c.textAlign = 'center';
-    c.textBaseline = 'top';
-    c.fillText('GRADIENT', width / 2, height * 0.08);
-
-    // Value — slightly smaller font than other tiles to fit sign + decimal
     const valueStr = pct !== null ? formatPct(pct) : '--';
-    c.fillStyle = pct !== null ? theme.primaryColor : 'rgba(255,255,255,0.3)';
-    c.font = `bold ${height * 0.38}px ${theme.fontFamily}`;
-    c.textBaseline = 'middle';
-    c.fillText(valueStr, width / 2, height * 0.55);
+    const unitStr = '%';
+    const gap = height * 0.04;
 
-    // Unit
-    c.fillStyle = 'rgba(255,255,255,0.5)';
-    c.font = `${height * 0.16}px ${theme.fontFamily}`;
-    c.textBaseline = 'bottom';
-    c.fillText('%', width / 2, height * 0.97);
+    const valueFontSize = height * 0.50;
+    const unitFontSize = height * 0.28;
+
+    c.textBaseline = 'middle';
+    c.textAlign = 'left';
+
+    c.font = `bold ${valueFontSize}px ${theme.fontFamily}`;
+    const valueWidth = c.measureText(valueStr).width;
+
+    c.font = `${unitFontSize}px ${theme.fontFamily}`;
+    const unitWidth = c.measureText(unitStr).width;
+
+    const startX = (width - valueWidth - gap - unitWidth) / 2;
+    const midY = height / 2;
+
+    c.font = `bold ${valueFontSize}px ${theme.fontFamily}`;
+    c.fillStyle = pct !== null ? theme.primaryColor : 'rgba(255,255,255,0.3)';
+    c.fillText(valueStr, startX, midY);
+
+    c.font = `${unitFontSize}px ${theme.fontFamily}`;
+    c.fillStyle = theme.primaryColor;
+    c.fillText(unitStr, startX + valueWidth + gap, midY);
   },
 };
 

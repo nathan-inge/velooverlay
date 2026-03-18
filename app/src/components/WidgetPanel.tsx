@@ -53,18 +53,8 @@ const CATALOG: WidgetCatalogEntry[] = [
   },
 ];
 
-const FONT_OPTIONS = [
-  { label: 'Helvetica', value: 'Helvetica, sans-serif' },
-  { label: 'Arial', value: 'Arial, sans-serif' },
-  { label: 'System UI', value: 'system-ui, sans-serif' },
-  { label: 'Georgia', value: 'Georgia, serif' },
-  { label: 'Impact', value: 'Impact, sans-serif' },
-];
-
 export default function WidgetPanel() {
-  const { layout, selectedWidgetId, addWidget, removeWidget, selectWidget, updateTheme } = useStore();
-
-  const theme = layout.theme;
+  const { layout, selectedWidgetId, addWidget, removeWidget, selectWidget } = useStore();
 
   return (
     <div className="sidebar">
@@ -119,56 +109,6 @@ export default function WidgetPanel() {
         </div>
       )}
 
-      {/* Theme section */}
-      <div className="sidebar-section" style={{ borderBottom: 'none' }}>
-        <div className="sidebar-section-title">Theme</div>
-        <div className="inspector-fields">
-          <div className="inspector-field">
-            <div className="inspector-field-label">Accent Color</div>
-            <div className="color-field">
-              <label className="color-swatch" style={{ background: theme.primaryColor }}>
-                <input
-                  type="color"
-                  value={theme.primaryColor}
-                  onChange={(e) => updateTheme({ primaryColor: e.target.value })}
-                  style={{ opacity: 0, position: 'absolute', width: 0, height: 0 }}
-                />
-              </label>
-              <span style={{ fontSize: 11, color: 'var(--text-muted)' }}>{theme.primaryColor}</span>
-            </div>
-          </div>
-
-          <div className="inspector-field">
-            <div className="inspector-field-label">Font</div>
-            <select
-              className="inspector-input"
-              value={theme.fontFamily}
-              onChange={(e) => updateTheme({ fontFamily: e.target.value })}
-            >
-              {FONT_OPTIONS.map((f) => (
-                <option key={f.value} value={f.value}>
-                  {f.label}
-                </option>
-              ))}
-            </select>
-          </div>
-
-          <div className="inspector-field">
-            <div className="inspector-field-label">Background Opacity</div>
-            <div className="range-field">
-              <input
-                type="range"
-                min={0}
-                max={1}
-                step={0.05}
-                value={theme.backgroundOpacity}
-                onChange={(e) => updateTheme({ backgroundOpacity: Number(e.target.value) })}
-              />
-              <span className="range-readout">{theme.backgroundOpacity.toFixed(2)}</span>
-            </div>
-          </div>
-        </div>
-      </div>
     </div>
   );
 }
