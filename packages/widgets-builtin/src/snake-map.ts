@@ -23,7 +23,7 @@ export const SnakeMapWidget: WidgetDefinition<SnakeMapConfig> = {
   getDefaultConfig: () => ({ padding: 12, fullTrack: false }),
 
   render(ctx: WidgetRenderContext, config: SnakeMapConfig): void {
-    const { canvas, frame, route, theme, width, height } = ctx;
+    const { canvas, frame, route, videoRoute, theme, width, height } = ctx;
     const c = canvas.getContext('2d')!;
     const pad = config.padding;
 
@@ -31,9 +31,12 @@ export const SnakeMapWidget: WidgetDefinition<SnakeMapConfig> = {
     c.fillStyle = `rgba(0, 0, 0, ${theme.backgroundOpacity})`;
     c.fillRect(0, 0, width, height);
 
-    if (route.points.length < 2) return;
+    // When fullTrack is false, constrain the map to the video-aligned extent.
+    const activeRoute = config.fullTrack ? route : (videoRoute ?? route);
 
-    const { minLat, maxLat, minLon, maxLon } = route.bounds;
+    if (activeRoute.points.length < 2) return;
+
+    const { minLat, maxLat, minLon, maxLon } = activeRoute.bounds;
     const drawW = width - pad * 2;
     const drawH = height - pad * 2;
 
@@ -52,13 +55,13 @@ export const SnakeMapWidget: WidgetDefinition<SnakeMapConfig> = {
     ];
 
     // Find the current frame's closest route index.
-    const currentIdx = findCurrentRouteIndex(route.points, frame.lat, frame.lon);
+    const currentIdx = findCurrentRouteIndex(activeRoute.points, frame.lat, frame.lon);
 
-    // 1. Ghost line — full route at low opacity.
+    // 1. Ghost line — full (active) route at low opacity.
     c.beginPath();
     c.strokeStyle = `${theme.primaryColor}40`; // 25% opacity via hex alpha
     c.lineWidth = 2;
-    route.points.forEach(({ lat, lon }, i) => {
+    activeRoute.points.forEach(({ lat, lon }, i) => {
       const [x, y] = project(lat, lon);
       i === 0 ? c.moveTo(x, y) : c.lineTo(x, y);
     });
@@ -69,7 +72,7 @@ export const SnakeMapWidget: WidgetDefinition<SnakeMapConfig> = {
       c.beginPath();
       c.strokeStyle = theme.primaryColor;
       c.lineWidth = 2.5;
-      route.points.slice(0, currentIdx + 1).forEach(({ lat, lon }, i) => {
+      activeRoute.points.slice(0, currentIdx + 1).forEach(({ lat, lon }, i) => {
         const [x, y] = project(lat, lon);
         i === 0 ? c.moveTo(x, y) : c.lineTo(x, y);
       });

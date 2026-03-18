@@ -67,6 +67,8 @@ interface AppState {
   updateWidgetPosition: (id: string, x: number, y: number) => void;
   updateWidgetSize: (id: string, width: number, height: number) => void;
   selectWidget: (id: string | null) => void;
+  updateWidgetConfig: (id: string, patch: Record<string, unknown>) => void;
+  updateTheme: (patch: Partial<Layout['theme']>) => void;
   // Export
   exportVideo: () => Promise<void>;
 }
@@ -213,6 +215,23 @@ export const useStore = create<AppState>((set, get) => ({
   },
 
   selectWidget: (id) => set({ selectedWidgetId: id }),
+
+  updateWidgetConfig: (id, patch) => {
+    const { layout } = get();
+    set({
+      layout: {
+        ...layout,
+        widgets: layout.widgets.map((w) =>
+          w.id === id ? { ...w, config: { ...w.config, ...patch } } : w
+        ),
+      },
+    });
+  },
+
+  updateTheme: (patch) => {
+    const { layout } = get();
+    set({ layout: { ...layout, theme: { ...layout.theme, ...patch } } });
+  },
 
   // ── Export ──────────────────────────────────────────────────────
   exportVideo: async () => {

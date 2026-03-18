@@ -35,6 +35,26 @@ function toRouteData(dto: RouteDataDto | null): RouteData {
   };
 }
 
+function framesToVideoRoute(frames: TelemetryFrameDto[]): RouteData {
+  const pts = frames
+    .filter((f) => f.lat !== null && f.lon !== null)
+    .map((f) => ({ lat: f.lat!, lon: f.lon!, altitudeM: f.altitudeM }));
+  if (pts.length === 0) {
+    return { points: [], bounds: { minLat: 0, maxLat: 0, minLon: 0, maxLon: 0 } };
+  }
+  const lats = pts.map((p) => p.lat);
+  const lons = pts.map((p) => p.lon);
+  return {
+    points: pts,
+    bounds: {
+      minLat: Math.min(...lats),
+      maxLat: Math.max(...lats),
+      minLon: Math.min(...lons),
+      maxLon: Math.max(...lons),
+    },
+  };
+}
+
 function toSdkFrame(dto: TelemetryFrameDto | null): import('@velooverlay/widget-sdk').TelemetryFrame {
   if (!dto) {
     return {
@@ -77,6 +97,7 @@ export default function WidgetCanvas({ instance, videoRef, isSelected, scale }: 
 
   const widget = WIDGET_REGISTRY[instance.type];
   const sdkRoute = toRouteData(route);
+  const sdkVideoRoute = framesToVideoRoute(frames);
   const sdkTheme: Theme = {
     fontFamily: layout.theme.fontFamily,
     primaryColor: layout.theme.primaryColor,
@@ -101,6 +122,7 @@ export default function WidgetCanvas({ instance, videoRef, isSelected, scale }: 
       const renderCtx: WidgetRenderContext = {
         frame: sdkFrame,
         route: sdkRoute,
+        videoRoute: sdkVideoRoute,
         canvas,
         theme: sdkTheme,
         width: instance.size.width,

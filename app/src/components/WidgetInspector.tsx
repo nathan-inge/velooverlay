@@ -1,0 +1,73 @@
+import { useStore } from '../store/useStore';
+import type { WidgetInstance } from '../types';
+
+interface Props {
+  instance: WidgetInstance;
+}
+
+export default function WidgetInspector({ instance }: Props) {
+  const updateWidgetConfig = useStore((s) => s.updateWidgetConfig);
+  const patch = (p: Record<string, unknown>) => updateWidgetConfig(instance.id, p);
+
+  const cfg = instance.config as Record<string, unknown>;
+
+  function renderFields() {
+    switch (instance.type) {
+      case 'builtin:speedometer':
+        return (
+          <div className="inspector-field">
+            <div className="inspector-field-label">Unit</div>
+            <div className="seg-ctrl">
+              <button
+                className={`btn small${cfg.unit === 'kph' ? ' primary' : ''}`}
+                onClick={() => patch({ unit: 'kph' })}
+              >
+                KPH
+              </button>
+              <button
+                className={`btn small${cfg.unit === 'mph' ? ' primary' : ''}`}
+                onClick={() => patch({ unit: 'mph' })}
+              >
+                MPH
+              </button>
+            </div>
+          </div>
+        );
+
+      case 'builtin:snake-map':
+        return (
+          <>
+            <div className="inspector-field">
+              <div className="inspector-field-label">Padding</div>
+              <input
+                type="number"
+                className="inspector-input"
+                min={0}
+                max={50}
+                value={cfg.padding as number ?? 10}
+                onChange={(e) => patch({ padding: Number(e.target.value) })}
+              />
+            </div>
+            <div className="inspector-field">
+              <div className="inspector-field-label">Full Track</div>
+              <input
+                type="checkbox"
+                checked={cfg.fullTrack as boolean ?? true}
+                onChange={(e) => patch({ fullTrack: e.target.checked })}
+              />
+            </div>
+          </>
+        );
+
+      default:
+        return <div className="inspector-empty">No settings for this widget.</div>;
+    }
+  }
+
+  return (
+    <div className="sidebar-section" style={{ flexShrink: 0 }}>
+      <div className="sidebar-section-title">Properties</div>
+      <div className="inspector-fields">{renderFields()}</div>
+    </div>
+  );
+}

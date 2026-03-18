@@ -97,6 +97,14 @@ export interface WidgetRenderContext {
   /** Full route for widgets that need the complete path. */
   route: RouteData;
 
+  /**
+   * Route derived only from the video-aligned frames (i.e. the portion of the
+   * activity that overlaps with the video). Useful for widgets that want to
+   * show "video extent only" vs the full activity. Falls back to `route` when
+   * not provided.
+   */
+  videoRoute?: RouteData;
+
   /** The canvas element your widget should draw onto. */
   canvas: HTMLCanvasElement;
 
