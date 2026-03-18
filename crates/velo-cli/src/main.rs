@@ -226,13 +226,13 @@ fn run_render(args: RenderArgs) -> Result<()> {
     // the video may only cover part of the ride, but the map should show the
     // whole route. We parse once here so the pipeline can run separately.
     println!("Parsing telemetry (full track): {}", args.telemetry.display());
-    let full_track_points: Vec<(f64, f64)> = {
+    let full_track_points: Vec<(f64, f64, Option<f32>)> = {
         let registry = ParserRegistry::default();
         match registry.parse(&args.telemetry) {
             Ok(session) => session
                 .points
                 .iter()
-                .filter_map(|p| Some((p.lat?, p.lon?)))
+                .filter_map(|p| Some((p.lat?, p.lon?, p.altitude_m)))
                 .collect(),
             Err(e) => {
                 eprintln!("Warning: could not parse telemetry for full track: {e}");

@@ -25,9 +25,9 @@ pub fn draw(
     widget: &WidgetInstance,
     frame: &TelemetryFrame,
     all_frames: &[TelemetryFrame],
-    // GPS points (lat, lon) from the complete activity file, extracted before
-    // video-sync. Empty when not supplied by the caller.
-    full_track_points: &[(f64, f64)],
+    // GPS points (lat, lon, altitude_m) from the complete activity file,
+    // extracted before video-sync. Empty when not supplied by the caller.
+    full_track_points: &[(f64, f64, Option<f32>)],
     theme: &Theme,
 ) {
     let wx = widget.position.x as f32;
@@ -46,7 +46,7 @@ pub fn draw(
     // When full_track is active: encompasses the whole ride.
     // Otherwise: only the portion covered by the video.
     let bbox_pts: Vec<(f64, f64)> = if use_full_track {
-        full_track_points.to_vec()
+        full_track_points.iter().map(|&(lat, lon, _)| (lat, lon)).collect()
     } else {
         all_frames
             .iter()
@@ -107,7 +107,7 @@ pub fn draw(
     if use_full_track {
         draw_route_coords(
             pixmap,
-            full_track_points.iter().copied(),
+            full_track_points.iter().map(|&(lat, lon, _)| (lat, lon)),
             &to_pixel,
             ghost,
             1.5,

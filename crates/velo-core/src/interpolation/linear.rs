@@ -19,13 +19,18 @@ impl InterpolationStrategy for LinearInterpolation {
             return Err(InterpolationError::InvalidFrameRate(video.frame_rate));
         }
 
-        let frame_duration_ms = (1000.0 / video.frame_rate) as u64;
-        let total_frames = (video.duration_ms / frame_duration_ms) as usize;
+        // Use floating-point throughout to avoid integer-truncation drift.
+        // e.g. 29.97 fps → frame_duration = 33.367 ms, not 33 ms.
+        // Without this, total_frames is over-counted and every frame's
+        // video_time_ms drifts further from the real timestamp.
+        let total_frames =
+            (video.duration_ms as f64 * video.frame_rate as f64 / 1000.0).round() as usize;
 
         let mut frames = Vec::with_capacity(total_frames);
 
         for frame_index in 0..total_frames {
-            let video_time_ms = frame_index as u64 * frame_duration_ms;
+            let video_time_ms =
+                (frame_index as f64 * 1000.0 / video.frame_rate as f64).round() as u64;
 
             // Convert video time to telemetry time using the sync offset.
             // If offset is +3500ms, telemetry time 0 = video time 3500ms.

@@ -1,8 +1,14 @@
-# VeloOverlay
+<p align="center">
+  <img src="app/src/assets/logo.png" alt="VeloOverlay" width="520" />
+</p>
 
-Open source software for synchronizing cycling telemetry (GPS, HR, Power, Cadence) with POV video and rendering customizable widget overlays.
+Open source software for synchronizing cycling telemetry (GPS, HR, power, cadence, etc) with POV video and rendering customizable widget overlays.
 
-**License:** MIT | **Status:** Phase 0 — CLI in development
+<p align="center">
+  <img src="examples/DemoCapture.png" alt="VeloOverlay desktop app screenshot" width="900" />
+</p>
+
+**License:** MIT
 
 ---
 
@@ -36,6 +42,43 @@ brew install ffmpeg
 ```
 
 ---
+
+## Quick start
+
+### Desktop app (GUI)
+
+```bash
+# Install JS dependencies (monorepo workspaces)
+npm install
+
+# Run the Tauri desktop app in dev mode
+cd app
+cargo tauri dev
+```
+
+When you launch the app:
+
+- **Import Video**: choose an MP4 from your camera.
+- **Import Telemetry**: choose a `.fit` activity (Garmin / Wahoo / etc.).
+- **Edit layout**: add widgets, position them, tweak settings.
+- **Export MP4**: renders and re-encodes the final video (requires FFmpeg).
+
+### CLI
+
+```bash
+# Build the CLI
+cargo build -p velooverlay
+
+# Show help
+cargo run -p velooverlay -- --help
+```
+
+If you prefer an installed binary (local checkout):
+
+```bash
+cargo install --path crates/velo-cli
+velooverlay --help
+```
 
 ## Repository Structure
 
@@ -182,9 +225,11 @@ Widget types available in Phase 0:
 
 ```bash
 # Run in development mode (hot-reload)
+cd app
 cargo tauri dev
 
 # Build a release binary
+cd app
 cargo tauri build
 ```
 
@@ -216,8 +261,6 @@ export const MyWidget: WidgetDefinition = {
   },
 };
 ```
-
-Submit to the [VeloOverlay Marketplace](https://github.com/velooverlay/velooverlay-marketplace).
 
 ---
 

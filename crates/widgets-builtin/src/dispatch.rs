@@ -4,14 +4,14 @@ use tiny_skia::{Paint, Pixmap, Rect, Transform};
 use velo_core::model::TelemetryFrame;
 use velo_core::render::layout::{Theme, WidgetInstance};
 
-use crate::{metric_tile, snake_map};
+use crate::{elevation_profile, metric_tile, snake_map};
 
 pub fn draw_widget(
     pixmap: &mut Pixmap,
     widget: &WidgetInstance,
     frame: &TelemetryFrame,
     all_frames: &[TelemetryFrame],
-    full_track_points: &[(f64, f64)],
+    full_track_points: &[(f64, f64, Option<f32>)],
     theme: &Theme,
     font: Option<&Font>,
 ) {
@@ -24,6 +24,9 @@ pub fn draw_widget(
         "builtin:power" => metric_tile::draw_power(pixmap, widget, frame, theme, font),
         "builtin:snake-map" => {
             snake_map::draw(pixmap, widget, frame, all_frames, full_track_points, theme)
+        }
+        "builtin:elevation-profile" => {
+            elevation_profile::draw(pixmap, widget, frame, all_frames, full_track_points, theme)
         }
         _ => draw_unknown_placeholder(pixmap, widget),
     }

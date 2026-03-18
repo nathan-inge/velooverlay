@@ -18,19 +18,20 @@ pub struct CliRenderer {
     pub width: u32,
     pub height: u32,
     font: Option<Font>,
-    /// GPS points (lat, lon) from the full activity file.
-    /// Empty when not provided — snake-map will fall back to video-only frames.
-    full_track_points: Vec<(f64, f64)>,
+    /// GPS points (lat, lon, altitude_m) from the full activity file.
+    /// Empty when not provided — widgets will fall back to video-only frames.
+    full_track_points: Vec<(f64, f64, Option<f32>)>,
 }
 
 impl CliRenderer {
-    /// `full_track_points`: lat/lon pairs from the complete `TelemetrySession`,
-    /// pre-extracted before the video-sync step. Pass `vec![]` if unavailable.
+    /// `full_track_points`: (lat, lon, altitude_m) triples from the complete
+    /// `TelemetrySession`, pre-extracted before the video-sync step.
+    /// Pass `vec![]` if unavailable.
     pub fn new(
         width: u32,
         height: u32,
         font: Option<Font>,
-        full_track_points: Vec<(f64, f64)>,
+        full_track_points: Vec<(f64, f64, Option<f32>)>,
     ) -> Self {
         Self {
             width,

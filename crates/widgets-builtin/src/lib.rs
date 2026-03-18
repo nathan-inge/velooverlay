@@ -10,5 +10,6 @@ pub mod font;
 pub mod renderer;
 
 mod dispatch;
+mod elevation_profile;
 mod metric_tile;
 mod snake_map;
