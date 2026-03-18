@@ -100,30 +100,46 @@ pub fn draw(
     draw_background(pixmap, wx, wy, ww, wh, theme.background_opacity);
 
     let primary = parse_hex_color(&theme.primary_color);
-    let ghost = [primary[0], primary[1], primary[2], primary[3] / 4];
+    // Ghost halo: black 60%; ghost fill: primary at ~31% (0x50 = 80/255).
+    let ghost_halo = [0u8, 0, 0, 153];
+    let ghost_fill = [primary[0], primary[1], primary[2], 80];
+    // Ridden halo: black 70%.
+    let ridden_halo = [0u8, 0, 0, 178];
 
-    // --- Ghost route ---
-    // Source depends on full_track config: entire activity vs video frames only.
+    // --- Ghost route: dark halo first, faint primary on top ---
     if use_full_track {
         draw_route_coords(
             pixmap,
             full_track_points.iter().map(|&(lat, lon, _)| (lat, lon)),
             &to_pixel,
-            ghost,
-            1.5,
+            ghost_halo,
+            4.0,
+        );
+        draw_route_coords(
+            pixmap,
+            full_track_points.iter().map(|&(lat, lon, _)| (lat, lon)),
+            &to_pixel,
+            ghost_fill,
+            2.0,
         );
     } else {
-        draw_route_frames(pixmap, all_frames, &to_pixel, ghost, 1.5);
+        draw_route_frames(pixmap, all_frames, &to_pixel, ghost_halo, 4.0);
+        draw_route_frames(pixmap, all_frames, &to_pixel, ghost_fill, 2.0);
     }
 
-    // --- Ridden portion (always the video-aligned frames up to now) ---
+    // --- Ridden portion: dark halo, then solid primary on top ---
     let current_idx = (frame.frame_index as usize).min(all_frames.len().saturating_sub(1));
-    draw_route_frames(pixmap, &all_frames[..=current_idx], &to_pixel, primary, 2.5);
+    if current_idx > 0 {
+        draw_route_frames(pixmap, &all_frames[..=current_idx], &to_pixel, ridden_halo, 4.5);
+        draw_route_frames(pixmap, &all_frames[..=current_idx], &to_pixel, primary, 2.5);
+    }
 
-    // --- Head marker ---
+    // --- Head marker: dark outer fill, white inner fill, primary stroke ring ---
     if let (Some(lat), Some(lon)) = (frame.data.lat, frame.data.lon) {
         let (px, py) = to_pixel(lat, lon);
-        draw_circle(pixmap, px, py, 6.0, primary);
+        draw_circle(pixmap, px, py, 6.0, [0, 0, 0, 153]);          // dark outer
+        draw_circle(pixmap, px, py, 5.0, [255, 255, 255, 255]);     // white inner
+        draw_circle_stroke(pixmap, px, py, 5.0, primary, 2.0);      // primary ring
     }
 }
 
@@ -198,6 +214,25 @@ fn draw_route_coords(
 
     let stroke = Stroke {
         width: stroke_width,
+        ..Stroke::default()
+    };
+
+    pixmap.stroke_path(&path, &paint, &stroke, Transform::identity(), None);
+}
+
+fn draw_circle_stroke(pixmap: &mut Pixmap, cx: f32, cy: f32, radius: f32, color: [u8; 4], width: f32) {
+    let mut builder = PathBuilder::new();
+    builder.push_circle(cx, cy, radius);
+    let Some(path) = builder.finish() else {
+        return;
+    };
+
+    let mut paint = Paint::default();
+    paint.set_color_rgba8(color[0], color[1], color[2], color[3]);
+    paint.anti_alias = true;
+
+    let stroke = Stroke {
+        width,
         ..Stroke::default()
     };
 

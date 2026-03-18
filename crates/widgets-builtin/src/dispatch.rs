@@ -28,6 +28,12 @@ pub fn draw_widget(
         "builtin:elevation-profile" => {
             elevation_profile::draw(pixmap, widget, frame, all_frames, full_track_points, theme)
         }
+        "builtin:elevation" => {
+            metric_tile::draw_elevation(pixmap, widget, frame, theme, font)
+        }
+        "builtin:gradient" => {
+            metric_tile::draw_gradient(pixmap, widget, frame, all_frames, theme, font)
+        }
         _ => draw_unknown_placeholder(pixmap, widget),
     }
 }
