@@ -61,11 +61,11 @@ body,
 }
 
 .toolbar-logo {
-  font-weight: 700;
-  font-size: 15px;
-  color: var(--accent);
-  margin-right: 8px;
-  letter-spacing: 0.02em;
+  height: 32px;
+  width: auto;
+  margin-right: 4px;
+  display: block;
+  flex-shrink: 0;
 }
 
 .toolbar-sep {

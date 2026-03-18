@@ -1,4 +1,5 @@
 import { useStore } from '../store/useStore';
+import logo from '../assets/logo.png';
 
 export default function Toolbar() {
   const {
@@ -17,7 +18,7 @@ export default function Toolbar() {
 
   return (
     <div className="toolbar">
-      <span className="toolbar-logo">VeloOverlay</span>
+      <img src={logo} alt="VeloOverlay" className="toolbar-logo" />
       <div className="toolbar-sep" />
 
       <button className="btn" onClick={() => void importVideo()} disabled={isProcessing}>
