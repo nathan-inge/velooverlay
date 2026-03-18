@@ -16,6 +16,7 @@ struct FfprobeOutput {
 struct FfprobeStream {
     codec_type: Option<String>,
     r_frame_rate: Option<String>,
+    avg_frame_rate: Option<String>,
 }
 
 #[derive(Deserialize)]
@@ -64,8 +65,14 @@ pub fn probe(path: &Path) -> Result<VideoMetadata> {
         .streams
         .iter()
         .find(|s| s.codec_type.as_deref() == Some("video"))
-        .and_then(|s| s.r_frame_rate.as_deref())
-        .map(parse_frame_rate)
+        .and_then(|s| {
+            // Prefer avg_frame_rate (actual display fps); r_frame_rate can be a
+            // codec timebase like "90000/1" for VFR/screen recordings which
+            // would produce millions of frames and break the pipeline.
+            let avg = s.avg_frame_rate.as_deref().map(parse_frame_rate).filter(|&r| r > 0.0 && r < 1000.0);
+            let r = s.r_frame_rate.as_deref().map(parse_frame_rate).filter(|&r| r > 0.0 && r < 1000.0);
+            avg.or(r)
+        })
         .unwrap_or(30.0);
 
     let recorded_start_time: Option<DateTime<Utc>> = probe

@@ -59,6 +59,31 @@ export default function WidgetInspector({ instance }: Props) {
           </>
         );
 
+      case 'builtin:elevation-profile':
+        return (
+          <>
+            <div className="inspector-field">
+              <div className="inspector-field-label">Padding</div>
+              <input
+                type="number"
+                className="inspector-input"
+                min={0}
+                max={50}
+                value={cfg.padding as number ?? 12}
+                onChange={(e) => patch({ padding: Number(e.target.value) })}
+              />
+            </div>
+            <div className="inspector-field">
+              <div className="inspector-field-label">Full Track</div>
+              <input
+                type="checkbox"
+                checked={cfg.fullTrack as boolean ?? true}
+                onChange={(e) => patch({ fullTrack: e.target.checked })}
+              />
+            </div>
+          </>
+        );
+
       default:
         return <div className="inspector-empty">No settings for this widget.</div>;
     }

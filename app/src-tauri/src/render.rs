@@ -31,14 +31,14 @@ pub fn export(
     let layout: Layout =
         serde_json::from_str(layout_json).context("Failed to parse layout JSON")?;
 
-    // 3. Collect the full GPS track for the snake-map widget.
-    let full_track_points: Vec<(f64, f64)> = {
+    // 3. Collect the full GPS track (with altitude) for map/elevation widgets.
+    let full_track_points: Vec<(f64, f64, Option<f32>)> = {
         let registry = ParserRegistry::default();
         match registry.parse(telemetry_path) {
             Ok(session) => session
                 .points
                 .iter()
-                .filter_map(|p| Some((p.lat?, p.lon?)))
+                .filter_map(|p| Some((p.lat?, p.lon?, p.altitude_m)))
                 .collect(),
             Err(e) => {
                 eprintln!("Warning: could not parse telemetry for full track: {e}");
@@ -80,9 +80,13 @@ pub fn export(
             &format!("{:.6}", video_meta.frame_rate),
             "-i",
             "pipe:0",
-            // Composite
+            // Scale the source video to 1920×1080, matching the GUI stage's
+            // CSS `object-fit: cover` behaviour (scale to fill, crop centre).
+            // Without this, widget positions only line up for native 1080p input.
             "-filter_complex",
-            "[0:v][1:v]overlay=0:0",
+            "[0:v]scale=1920:1080:force_original_aspect_ratio=increase,\
+             crop=1920:1080:(iw-1920)/2:(ih-1080)/2[base];\
+             [base][1:v]overlay=0:0",
             "-c:v",
             "libx264",
             "-crf",
@@ -100,9 +104,14 @@ pub fn export(
         let stdin = ffmpeg.stdin.as_mut().expect("FFmpeg stdin not piped");
         for frame in &frames {
             let rgba = renderer.render_frame(frame, &frames, &layout);
-            stdin
-                .write_all(&rgba)
-                .context("Failed to write overlay frame to FFmpeg")?;
+            match stdin.write_all(&rgba) {
+                Ok(_) => {}
+                // FFmpeg closed its stdin after processing the last video frame.
+                // Treat this as a clean finish — the remaining overlay frames are
+                // beyond the video's end and FFmpeg no longer needs them.
+                Err(e) if e.kind() == std::io::ErrorKind::BrokenPipe => break,
+                Err(e) => return Err(anyhow::Error::from(e).context("Failed to write overlay frame to FFmpeg")),
+            }
         }
     }
 

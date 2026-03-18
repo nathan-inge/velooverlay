@@ -17,6 +17,12 @@ const CATALOG: WidgetCatalogEntry[] = [
     defaultConfig: { padding: 10, fullTrack: true },
   },
   {
+    type: 'builtin:elevation-profile',
+    name: 'Elevation Profile',
+    defaultSize: { width: 400, height: 150 },
+    defaultConfig: { padding: 12, fullTrack: true },
+  },
+  {
     type: 'builtin:heart-rate',
     name: 'Heart Rate',
     defaultSize: { width: 140, height: 80 },

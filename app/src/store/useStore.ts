@@ -241,13 +241,24 @@ export const useStore = create<AppState>((set, get) => ({
     const outputPath = await save({ filters: VIDEO_OUTPUT_FILTERS, defaultPath: 'output.mp4' });
     if (!outputPath) return;
 
+    // The Rust Layout struct (and CLI layout.json format) uses snake_case theme
+    // keys. Convert before serializing so serde can parse the JSON correctly.
+    const layoutForExport = {
+      ...layout,
+      theme: {
+        font_family: layout.theme.fontFamily,
+        primary_color: layout.theme.primaryColor,
+        background_opacity: layout.theme.backgroundOpacity,
+      },
+    };
+
     set({ isExporting: true, exportError: null });
     try {
       await invoke('export_video', {
         videoPath,
         telemetryPath,
         offsetMs,
-        layoutJson: JSON.stringify(layout),
+        layoutJson: JSON.stringify(layoutForExport),
         outputPath,
       });
       set({ isExporting: false });

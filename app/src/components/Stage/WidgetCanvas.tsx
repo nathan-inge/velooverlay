@@ -3,6 +3,7 @@ import type { RouteData, WidgetRenderContext, Theme } from '@velooverlay/widget-
 import {
   SpeedometerWidget,
   SnakeMapWidget,
+  ElevationProfileWidget,
   HeartRateWidget,
   CadenceWidget,
   PowerWidget,
@@ -15,6 +16,7 @@ import { useStore } from '../../store/useStore';
 const WIDGET_REGISTRY: Record<string, WidgetDefinition> = {
   'builtin:speedometer': SpeedometerWidget,
   'builtin:snake-map': SnakeMapWidget,
+  'builtin:elevation-profile': ElevationProfileWidget,
   'builtin:heart-rate': HeartRateWidget,
   'builtin:cadence': CadenceWidget,
   'builtin:power': PowerWidget,
