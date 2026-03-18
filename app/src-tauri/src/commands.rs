@@ -41,6 +41,7 @@ pub struct RoutePointDto {
     pub lat: f64,
     pub lon: f64,
     pub altitude_m: Option<f32>,
+    pub distance_m: Option<f32>,
 }
 
 #[derive(Serialize)]
@@ -124,10 +125,10 @@ pub fn process_telemetry(
         .map_err(|e| format!("Failed to parse telemetry: {e}"))?;
 
     // Build RouteDataDto from the raw session points.
-    let gps_points: Vec<(f64, f64, Option<f32>)> = session
+    let gps_points: Vec<(f64, f64, Option<f32>, Option<f32>)> = session
         .points
         .iter()
-        .filter_map(|p| Some((p.lat?, p.lon?, p.altitude_m)))
+        .filter_map(|p| Some((p.lat?, p.lon?, p.altitude_m, p.distance_m)))
         .collect();
 
     let route = if gps_points.is_empty() {
@@ -141,17 +142,18 @@ pub fn process_telemetry(
             },
         }
     } else {
-        let min_lat = gps_points.iter().map(|(lat, _, _)| *lat).fold(f64::INFINITY, f64::min);
-        let max_lat = gps_points.iter().map(|(lat, _, _)| *lat).fold(f64::NEG_INFINITY, f64::max);
-        let min_lon = gps_points.iter().map(|(_, lon, _)| *lon).fold(f64::INFINITY, f64::min);
-        let max_lon = gps_points.iter().map(|(_, lon, _)| *lon).fold(f64::NEG_INFINITY, f64::max);
+        let min_lat = gps_points.iter().map(|(lat, _, _, _)| *lat).fold(f64::INFINITY, f64::min);
+        let max_lat = gps_points.iter().map(|(lat, _, _, _)| *lat).fold(f64::NEG_INFINITY, f64::max);
+        let min_lon = gps_points.iter().map(|(_, lon, _, _)| *lon).fold(f64::INFINITY, f64::min);
+        let max_lon = gps_points.iter().map(|(_, lon, _, _)| *lon).fold(f64::NEG_INFINITY, f64::max);
         RouteDataDto {
             points: gps_points
                 .iter()
-                .map(|(lat, lon, alt)| RoutePointDto {
+                .map(|(lat, lon, alt, dist)| RoutePointDto {
                     lat: *lat,
                     lon: *lon,
                     altitude_m: *alt,
+                    distance_m: *dist,
                 })
                 .collect(),
             bounds: RouteBoundsDto {

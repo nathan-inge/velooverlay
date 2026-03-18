@@ -89,7 +89,7 @@ export default function WidgetInspector({ instance }: Props) {
           <div className="inspector-field">
             <div className="inspector-field-label">Smoothing</div>
             <div className="seg-ctrl">
-              {([50, 100, 200] as const).map((m) => (
+              {([100, 200, 400] as const).map((m) => (
                 <button
                   key={m}
                   className={`btn small${cfg.windowM === m ? ' primary' : ''}`}

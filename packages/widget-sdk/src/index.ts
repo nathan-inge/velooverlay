@@ -56,7 +56,7 @@ export interface TelemetryFrame {
 /** The complete GPS route, available for widgets that show the full path (e.g. snake map). */
 export interface RouteData {
   /** All GPS points for the session, in order. */
-  points: Array<{ lat: number; lon: number; altitudeM: number | null }>;
+  points: Array<{ lat: number; lon: number; altitudeM: number | null; distanceM: number | null }>;
 
   /** Bounding box for coordinate-to-pixel mapping. */
   bounds: {

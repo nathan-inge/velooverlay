@@ -36,7 +36,7 @@ function toRouteData(dto: RouteDataDto | null): RouteData {
     return { points: [], bounds: { minLat: 0, maxLat: 0, minLon: 0, maxLon: 0 } };
   }
   return {
-    points: dto.points.map((p) => ({ lat: p.lat, lon: p.lon, altitudeM: p.altitudeM })),
+    points: dto.points.map((p) => ({ lat: p.lat, lon: p.lon, altitudeM: p.altitudeM, distanceM: p.distanceM })),
     bounds: dto.bounds,
   };
 }
@@ -44,7 +44,7 @@ function toRouteData(dto: RouteDataDto | null): RouteData {
 function framesToVideoRoute(frames: TelemetryFrameDto[]): RouteData {
   const pts = frames
     .filter((f) => f.lat !== null && f.lon !== null)
-    .map((f) => ({ lat: f.lat!, lon: f.lon!, altitudeM: f.altitudeM }));
+    .map((f) => ({ lat: f.lat!, lon: f.lon!, altitudeM: f.altitudeM, distanceM: f.distanceM }));
   if (pts.length === 0) {
     return { points: [], bounds: { minLat: 0, maxLat: 0, minLon: 0, maxLon: 0 } };
   }

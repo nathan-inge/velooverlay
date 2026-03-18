@@ -24,6 +24,7 @@ export interface RoutePointDto {
   lat: number;
   lon: number;
   altitudeM: number | null;
+  distanceM: number | null;
 }
 
 export interface RouteBoundsDto {
