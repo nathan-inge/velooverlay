@@ -7,6 +7,7 @@ import {
   HeartRateWidget,
   CadenceWidget,
   PowerWidget,
+  ElevationWidget,
 } from '@velooverlay/widgets-builtin';
 import type { WidgetDefinition } from '@velooverlay/widget-sdk';
 import type { TelemetryFrameDto, WidgetInstance, RouteDataDto } from '../../types';
@@ -20,6 +21,7 @@ const WIDGET_REGISTRY: Record<string, WidgetDefinition> = {
   'builtin:heart-rate': HeartRateWidget,
   'builtin:cadence': CadenceWidget,
   'builtin:power': PowerWidget,
+  'builtin:elevation': ElevationWidget,
 };
 
 const SNAP = 10;

@@ -40,6 +40,12 @@ const CATALOG: WidgetCatalogEntry[] = [
     defaultSize: { width: 140, height: 80 },
     defaultConfig: {},
   },
+  {
+    type: 'builtin:elevation',
+    name: 'Elevation',
+    defaultSize: { width: 140, height: 80 },
+    defaultConfig: { unit: 'm' },
+  },
 ];
 
 const FONT_OPTIONS = [

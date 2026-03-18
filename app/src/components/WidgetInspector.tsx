@@ -84,6 +84,27 @@ export default function WidgetInspector({ instance }: Props) {
           </>
         );
 
+      case 'builtin:elevation':
+        return (
+          <div className="inspector-field">
+            <div className="inspector-field-label">Unit</div>
+            <div className="seg-ctrl">
+              <button
+                className={`btn small${cfg.unit === 'm' ? ' primary' : ''}`}
+                onClick={() => patch({ unit: 'm' })}
+              >
+                m
+              </button>
+              <button
+                className={`btn small${cfg.unit === 'ft' ? ' primary' : ''}`}
+                onClick={() => patch({ unit: 'ft' })}
+              >
+                ft
+              </button>
+            </div>
+          </div>
+        );
+
       default:
         return <div className="inspector-empty">No settings for this widget.</div>;
     }
