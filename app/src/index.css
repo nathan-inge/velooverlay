@@ -379,26 +379,11 @@ body,
   max-width: none !important;
 }
 
-.timeline-label {
-  font-size: 11px;
-  color: var(--text-muted);
-  white-space: nowrap;
-  min-width: 80px;
-}
-
 .timeline-slider {
   flex: 1;
   max-width: 320px;
   accent-color: var(--accent);
   cursor: pointer;
-}
-
-.timeline-value {
-  font-size: 12px;
-  color: var(--accent);
-  min-width: 60px;
-  text-align: right;
-  font-variant-numeric: tabular-nums;
 }
 
 .timeline-time {
@@ -511,67 +496,69 @@ body,
 /* ── Sync Timeline ──────────────────────────────────────────── */
 .sync-tl-wrapper {
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   gap: 10px;
 }
 
-.sync-tl-label {
-  font-size: 11px;
+.sync-tl-labels {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+  min-width: 60px;
+  padding-top: 3px;
+  text-align: right;
+}
+
+.sync-tl-labels span {
+  font-size: 10px;
   color: var(--text-muted);
   white-space: nowrap;
-  min-width: 80px;
+  line-height: 15px;
+}
+
+.sync-tl-tracks {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
 }
 
 .sync-tl {
-  flex: 1;
   position: relative;
-  height: 28px;
-  background: var(--surface2);
-  border: 1px solid var(--border);
-  border-radius: 4px;
+  height: 48px;
   overflow: hidden;
+  cursor: grab;
 }
 
-/* Gray bar = telemetry session extent */
+/* Telemetry line — bottom row */
 .sync-tl-track {
   position: absolute;
-  top: 6px;
-  height: 16px;
-  background: #333;
+  top: 22px;
+  height: 4px;
+  background: #555;
   border-radius: 2px;
 }
 
-/* Accent block = where the video clip sits */
+/* Video line — top row, draggable */
 .sync-tl-clip {
   position: absolute;
   top: 4px;
-  height: 20px;
-  background: rgba(0, 209, 255, 0.25);
+  height: 10px;
+  background: rgba(0, 209, 255, 0.2);
   border: 1px solid var(--accent);
   border-radius: 3px;
   cursor: ew-resize;
-  display: flex;
-  align-items: center;
   overflow: hidden;
   min-width: 4px;
 }
 
-.sync-tl-clip-label {
-  font-size: 9px;
-  color: var(--accent);
-  padding: 0 4px;
-  pointer-events: none;
-  white-space: nowrap;
-  overflow: hidden;
-}
-
-/* White playhead line */
+/* Playhead within the video line */
 .sync-tl-playhead {
   position: absolute;
   top: 0;
   bottom: 0;
   width: 2px;
-  background: #fff;
+  background: rgba(255, 255, 255, 0.8);
   border-radius: 1px;
   pointer-events: none;
   transform: translateX(-50%);
@@ -580,7 +567,9 @@ body,
 /* Time tick labels */
 .sync-tl-ticks {
   position: absolute;
-  inset: 0;
+  bottom: 0;
+  left: 0;
+  right: 0;
   pointer-events: none;
 }
 
@@ -591,6 +580,58 @@ body,
   color: var(--text-muted);
   transform: translateX(-50%);
   white-space: nowrap;
+}
+
+/* Offset readout */
+.sync-tl-offset-label {
+  position: absolute;
+  top: 2px;
+  right: 4px;
+  font-size: 10px;
+  color: var(--text-muted);
+  pointer-events: none;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+/* Overview strip */
+.sync-tl-overview {
+  height: 18px;
+  background: var(--surface2);
+  border: 1px solid var(--border);
+  border-radius: 3px;
+  overflow: hidden;
+  cursor: pointer;
+  position: relative;
+}
+
+.sync-tl-ov-track {
+  position: absolute;
+  top: 50%;
+  transform: translateY(-50%);
+  height: 2px;
+  background: #444;
+  border-radius: 1px;
+}
+
+.sync-tl-ov-clip {
+  position: absolute;
+  top: 50%;
+  transform: translateY(-50%);
+  height: 4px;
+  background: var(--accent);
+  border-radius: 1px;
+  min-width: 2px;
+}
+
+.sync-tl-ov-viewport {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  background: rgba(255, 255, 255, 0.15);
+  border-left: 1px solid rgba(255, 255, 255, 0.4);
+  border-right: 1px solid rgba(255, 255, 255, 0.4);
+  pointer-events: none;
 }
 
 /* ── Scrollbar ──────────────────────────────────────────────── */

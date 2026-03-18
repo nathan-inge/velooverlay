@@ -1,4 +1,4 @@
-import { useRef } from 'react';
+import { useRef, useState, useEffect } from 'react';
 import { useStore } from '../store/useStore';
 
 function formatTime(ms: number): string {
@@ -17,83 +17,258 @@ interface Props {
 
 export default function SyncTimeline({ videoTimeMs, videoDurationMs, sessionDurationMs }: Props) {
   const { offsetMs, setOffsetMs } = useStore();
-  const barRef = useRef<HTMLDivElement>(null);
-  const dragRef = useRef<{ startX: number; startOffset: number } | null>(null);
 
+  // Zoom/pan view state — null means auto-fit (full range, current behavior)
+  const [viewStartMs, setViewStartMs] = useState<number | null>(null);
+  const [viewDurationMs, setViewDurationMs] = useState<number | null>(null);
+
+  const barRef = useRef<HTMLDivElement>(null);
+  const overviewRef = useRef<HTMLDivElement>(null);
+
+  // Refs kept current on every render — used by the stable wheel handler closure
+  const viewStartRef = useRef<number | null>(null);
+  const viewDurRef = useRef<number | null>(null);
+  const fullDurationRef = useRef<number>(0);
+  const fullStartRef = useRef<number>(0);
+
+  // Drag state
+  const clipDragRef = useRef<{ startX: number; startOffset: number } | null>(null);
+  const ovDragRef = useRef(false);
+
+  // Wheel zoom handler — must be non-passive, added once with stable closure via refs
+  useEffect(() => {
+    const el = barRef.current;
+    if (!el) return;
+
+    const onWheel = (e: WheelEvent) => {
+      e.preventDefault();
+      const fStart = fullStartRef.current;
+      const fDur = fullDurationRef.current;
+      if (!fDur) return;
+
+      const rect = el.getBoundingClientRect();
+      const cursorFrac = Math.max(0, Math.min(1, (e.clientX - rect.left) / rect.width));
+
+      const curViewStart = viewStartRef.current ?? fStart;
+      const curViewDur = viewDurRef.current ?? fDur;
+
+      const ZOOM_SPEED = 0.15;
+      const factor = e.deltaY > 0 ? (1 - ZOOM_SPEED) : (1 + ZOOM_SPEED);
+
+      let newDur = curViewDur * factor;
+      newDur = Math.max(2000, Math.min(fDur, newDur));
+
+      // Anchor zoom to cursor position
+      const anchorMs = curViewStart + cursorFrac * curViewDur;
+      let newStart = anchorMs - cursorFrac * newDur;
+      newStart = Math.max(fStart, Math.min(fStart + fDur - newDur, newStart));
+
+      if (newDur >= fDur - 100) {
+        setViewStartMs(null);
+        setViewDurationMs(null);
+      } else {
+        setViewStartMs(newStart);
+        setViewDurationMs(newDur);
+      }
+    };
+
+    el.addEventListener('wheel', onWheel, { passive: false });
+    return () => el.removeEventListener('wheel', onWheel);
+  }, []);
+
+  // All hooks must be above this early return
   if (!sessionDurationMs || !videoDurationMs) return null;
 
-  // Compute display range so both the telemetry session and the video clip are always visible.
-  const displayStart = Math.min(0, offsetMs);
-  const displayEnd = Math.max(sessionDurationMs, offsetMs + videoDurationMs);
-  const displayDuration = displayEnd - displayStart;
+  // Full auto-fit range.
+  // The video clip sits at telemetry position -offsetMs because:
+  //   telem_time = video_time - offset_ms  →  at video_time=0, telem=(-offsetMs)
+  const fullStart = Math.min(0, -offsetMs);
+  const fullEnd = Math.max(sessionDurationMs, -offsetMs + videoDurationMs);
+  const fullDuration = fullEnd - fullStart;
 
-  // Convert a millisecond value to a percentage of the display range.
-  const pct = (ms: number) => ((ms - displayStart) / displayDuration) * 100;
+  // Keep refs current for wheel handler
+  viewStartRef.current = viewStartMs;
+  viewDurRef.current = viewDurationMs;
+  fullDurationRef.current = fullDuration;
+  fullStartRef.current = fullStart;
 
-  const telemetryLeft = pct(0);
-  const telemetryWidth = (sessionDurationMs / displayDuration) * 100;
-  const clipLeft = pct(offsetMs);
-  const clipWidth = (videoDurationMs / displayDuration) * 100;
-  // Playhead: position within the clip block, as percentage of clip width.
-  const playheadPctInClip = videoDurationMs > 0 ? (videoTimeMs / videoDurationMs) * 100 : 0;
+  const isZoomed = viewStartMs !== null && viewDurationMs !== null;
+  const viewStart = viewStartMs ?? fullStart;
+  const viewDur = viewDurationMs ?? fullDuration;
 
-  const handleMouseDown = (e: React.MouseEvent) => {
+  // Convert ms → % within zoomed view
+  const pct = (ms: number) => ((ms - viewStart) / viewDur) * 100;
+
+  // Main timeline positions
+  const telLeft = pct(0);
+  const telWidth = (sessionDurationMs / viewDur) * 100;
+  const clipLeft = pct(-offsetMs);
+  const clipWidth = (videoDurationMs / viewDur) * 100;
+  const playheadPct = videoDurationMs > 0 ? (videoTimeMs / videoDurationMs) * 100 : 0;
+
+  // Overview positions (always full range)
+  const ovPct = (ms: number) => ((ms - fullStart) / fullDuration) * 100;
+  const ovTelLeft = ovPct(0);
+  const ovTelWidth = (sessionDurationMs / fullDuration) * 100;
+  const ovClipLeft = ovPct(-offsetMs);
+  const ovClipWidth = (videoDurationMs / fullDuration) * 100;
+  const ovViewLeft = ovPct(viewStart);
+  const ovViewWidth = (viewDur / fullDuration) * 100;
+
+  // --- Event handlers ---
+
+  const handleClipMouseDown = (e: React.MouseEvent) => {
     e.stopPropagation();
     const bar = barRef.current;
     if (!bar) return;
-    dragRef.current = { startX: e.clientX, startOffset: offsetMs };
-
+    clipDragRef.current = { startX: e.clientX, startOffset: offsetMs };
     const barWidth = bar.getBoundingClientRect().width;
 
     const onMove = (me: MouseEvent) => {
-      if (!dragRef.current) return;
-      const dx = me.clientX - dragRef.current.startX;
-      const msPerPx = displayDuration / barWidth;
-      const newOffset = Math.round(dragRef.current.startOffset + dx * msPerPx);
-      setOffsetMs(newOffset);
+      if (!clipDragRef.current) return;
+      const dx = me.clientX - clipDragRef.current.startX;
+      const msPerPx = viewDur / barWidth;
+      // Clip displays at -offsetMs, so dragging right (positive dx) should decrease offsetMs
+      setOffsetMs(Math.round(clipDragRef.current.startOffset - dx * msPerPx));
     };
-
     const onUp = () => {
-      dragRef.current = null;
+      clipDragRef.current = null;
       window.removeEventListener('mousemove', onMove);
       window.removeEventListener('mouseup', onUp);
     };
+    window.addEventListener('mousemove', onMove);
+    window.addEventListener('mouseup', onUp);
+  };
 
+  const handleBgMouseDown = (e: React.MouseEvent) => {
+    if (!isZoomed) return;
+    const bar = barRef.current;
+    if (!bar) return;
+    const startX = e.clientX;
+    const startViewStart = viewStart;
+    const barWidth = bar.getBoundingClientRect().width;
+
+    const onMove = (me: MouseEvent) => {
+      const dx = me.clientX - startX;
+      const msPerPx = viewDur / barWidth;
+      let newStart = startViewStart - dx * msPerPx;
+      newStart = Math.max(fullStart, Math.min(fullStart + fullDuration - viewDur, newStart));
+      setViewStartMs(newStart);
+    };
+    const onUp = () => {
+      window.removeEventListener('mousemove', onMove);
+      window.removeEventListener('mouseup', onUp);
+    };
+    window.addEventListener('mousemove', onMove);
+    window.addEventListener('mouseup', onUp);
+  };
+
+  const handleDoubleClick = () => {
+    setViewStartMs(null);
+    setViewDurationMs(null);
+  };
+
+  const handleOverviewMouseDown = (e: React.MouseEvent) => {
+    if (!isZoomed) return;
+    const ov = overviewRef.current;
+    if (!ov) return;
+    ovDragRef.current = true;
+
+    const jumpToX = (clientX: number) => {
+      const rect = ov.getBoundingClientRect();
+      const fStart = fullStartRef.current;
+      const fDur = fullDurationRef.current;
+      const frac = Math.max(0, Math.min(1, (clientX - rect.left) / rect.width));
+      const clickMs = fStart + frac * fDur;
+      const curDur = viewDurRef.current ?? fDur;
+      let newStart = clickMs - curDur / 2;
+      newStart = Math.max(fStart, Math.min(fStart + fDur - curDur, newStart));
+      setViewStartMs(newStart);
+    };
+
+    jumpToX(e.clientX);
+
+    const onMove = (me: MouseEvent) => {
+      if (!ovDragRef.current) return;
+      jumpToX(me.clientX);
+    };
+    const onUp = () => {
+      ovDragRef.current = false;
+      window.removeEventListener('mousemove', onMove);
+      window.removeEventListener('mouseup', onUp);
+    };
     window.addEventListener('mousemove', onMove);
     window.addEventListener('mouseup', onUp);
   };
 
   return (
     <div className="sync-tl-wrapper">
-      <span className="sync-tl-label">Timeline</span>
-      <div className="sync-tl" ref={barRef}>
-        {/* Telemetry activity bar */}
+      <div className="sync-tl-labels">
+        <span>video</span>
+        <span>telemetry</span>
+      </div>
+      <div className="sync-tl-tracks">
+        {/* Main zoomed timeline */}
         <div
-          className="sync-tl-track"
-          style={{ left: `${telemetryLeft}%`, width: `${telemetryWidth}%` }}
-        />
-
-        {/* Draggable video clip block */}
-        <div
-          className="sync-tl-clip"
-          style={{ left: `${clipLeft}%`, width: `${clipWidth}%` }}
-          onMouseDown={handleMouseDown}
-          title="Drag to shift video position relative to telemetry"
+          className="sync-tl"
+          ref={barRef}
+          onMouseDown={handleBgMouseDown}
+          onDoubleClick={handleDoubleClick}
+          style={{ cursor: isZoomed ? 'grab' : 'default' }}
         >
-          {/* Playhead */}
+          {/* Video clip (top row) — draggable */}
           <div
-            className="sync-tl-playhead"
-            style={{ left: `${playheadPctInClip}%` }}
+            className="sync-tl-clip"
+            style={{ left: `${clipLeft}%`, width: `${clipWidth}%` }}
+            onMouseDown={handleClipMouseDown}
+            title="Drag to shift video position relative to telemetry"
+          >
+            <div
+              className="sync-tl-playhead"
+              style={{ left: `${playheadPct}%` }}
+            />
+          </div>
+
+          {/* Telemetry track (bottom row) */}
+          <div
+            className="sync-tl-track"
+            style={{ left: `${telLeft}%`, width: `${telWidth}%` }}
           />
-          <span className="sync-tl-clip-label">video</span>
+
+          {/* Tick labels */}
+          <div className="sync-tl-ticks">
+            <span style={{ left: `${pct(0)}%` }}>{formatTime(0)}</span>
+            <span style={{ left: `${pct(sessionDurationMs)}%` }}>
+              {formatTime(sessionDurationMs)}
+            </span>
+          </div>
+
+          {/* Offset readout — always visible, updates live while dragging */}
+          <div className="sync-tl-offset-label">
+            offset&thinsp;{offsetMs >= 0 ? '+' : ''}{(offsetMs / 1000).toFixed(2)}s
+          </div>
         </div>
 
-        {/* Tick labels */}
-        <div className="sync-tl-ticks">
-          <span style={{ left: `${telemetryLeft}%` }}>{formatTime(0)}</span>
-          <span style={{ left: `${telemetryLeft + telemetryWidth}%` }}>
-            {formatTime(sessionDurationMs)}
-          </span>
+        {/* Overview strip — always shows full range */}
+        <div
+          className="sync-tl-overview"
+          ref={overviewRef}
+          onMouseDown={handleOverviewMouseDown}
+        >
+          <div
+            className="sync-tl-ov-track"
+            style={{ left: `${ovTelLeft}%`, width: `${ovTelWidth}%` }}
+          />
+          <div
+            className="sync-tl-ov-clip"
+            style={{ left: `${ovClipLeft}%`, width: `${ovClipWidth}%` }}
+          />
+          {isZoomed && (
+            <div
+              className="sync-tl-ov-viewport"
+              style={{ left: `${ovViewLeft}%`, width: `${ovViewWidth}%` }}
+            />
+          )}
         </div>
       </div>
     </div>
