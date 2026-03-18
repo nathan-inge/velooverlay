@@ -57,31 +57,53 @@ export const SnakeMapWidget: WidgetDefinition<SnakeMapConfig> = {
     // Find the current frame's closest route index.
     const currentIdx = findCurrentRouteIndex(activeRoute.points, frame.lat, frame.lon);
 
-    // 1. Ghost line — full (active) route at low opacity.
-    c.beginPath();
-    c.strokeStyle = `${theme.primaryColor}40`; // 25% opacity via hex alpha
-    c.lineWidth = 2;
-    activeRoute.points.forEach(({ lat, lon }, i) => {
-      const [x, y] = project(lat, lon);
-      i === 0 ? c.moveTo(x, y) : c.lineTo(x, y);
-    });
-    c.stroke();
-
-    // 2. Ridden portion — solid line.
-    if (currentIdx > 0) {
+    const traceFull = () => {
       c.beginPath();
-      c.strokeStyle = theme.primaryColor;
-      c.lineWidth = 2.5;
+      activeRoute.points.forEach(({ lat, lon }, i) => {
+        const [x, y] = project(lat, lon);
+        i === 0 ? c.moveTo(x, y) : c.lineTo(x, y);
+      });
+    };
+
+    const traceRidden = () => {
+      c.beginPath();
       activeRoute.points.slice(0, currentIdx + 1).forEach(({ lat, lon }, i) => {
         const [x, y] = project(lat, lon);
         i === 0 ? c.moveTo(x, y) : c.lineTo(x, y);
       });
+    };
+
+    // 1. Ghost line — full route: dark halo then faint color on top.
+    c.lineJoin = 'round';
+    c.lineCap = 'round';
+    traceFull();
+    c.strokeStyle = 'rgba(0,0,0,0.6)';
+    c.lineWidth = 4;
+    c.stroke();
+    traceFull();
+    c.strokeStyle = `${theme.primaryColor}50`;
+    c.lineWidth = 2;
+    c.stroke();
+
+    // 2. Ridden portion — dark halo then solid color on top.
+    if (currentIdx > 0) {
+      traceRidden();
+      c.strokeStyle = 'rgba(0,0,0,0.7)';
+      c.lineWidth = 4.5;
+      c.stroke();
+      traceRidden();
+      c.strokeStyle = theme.primaryColor;
+      c.lineWidth = 2.5;
       c.stroke();
     }
 
-    // 3. Head marker — bright filled circle at current position.
+    // 3. Head marker — dark halo ring then white fill.
     if (frame.lat !== null && frame.lon !== null) {
       const [hx, hy] = project(frame.lat, frame.lon);
+      c.beginPath();
+      c.arc(hx, hy, 6, 0, Math.PI * 2);
+      c.fillStyle = 'rgba(0,0,0,0.6)';
+      c.fill();
       c.beginPath();
       c.arc(hx, hy, 5, 0, Math.PI * 2);
       c.fillStyle = '#FFFFFF';

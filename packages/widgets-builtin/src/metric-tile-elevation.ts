@@ -19,6 +19,9 @@ export const ElevationWidget: WidgetDefinition<ElevationConfig> = {
     c.fillStyle = `rgba(0, 0, 0, ${theme.backgroundOpacity})`;
     c.fillRect(0, 0, width, height);
 
+    c.shadowColor = 'rgba(0,0,0,0.9)';
+    c.shadowBlur = 6;
+
     const raw = frame.signalStatus === 'lost' ? null : frame.altitudeM;
     const value = raw !== null
       ? (config.unit === 'ft' ? raw * 3.28084 : raw)

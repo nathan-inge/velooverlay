@@ -29,6 +29,9 @@ export const SpeedometerWidget: WidgetDefinition<SpeedometerConfig> = {
       ? frame.speedMs * 3.6
       : frame.speedMs * 2.237;
 
+    c.shadowColor = 'rgba(0,0,0,0.9)';
+    c.shadowBlur = 6;
+
     // TODO: Replace with proper gauge rendering.
     c.fillStyle = theme.primaryColor;
     c.font = `bold ${height * 0.5}px ${theme.fontFamily}`;
@@ -47,6 +50,8 @@ function drawSignalLost(
   width: number,
   height: number,
 ): void {
+  c.shadowColor = 'rgba(0,0,0,0.9)';
+  c.shadowBlur = 6;
   c.fillStyle = 'rgba(255,255,255,0.4)';
   c.font = `${height * 0.2}px ${theme.fontFamily}`;
   c.textAlign = 'center';

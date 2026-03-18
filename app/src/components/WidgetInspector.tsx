@@ -84,6 +84,24 @@ export default function WidgetInspector({ instance }: Props) {
           </>
         );
 
+      case 'builtin:gradient':
+        return (
+          <div className="inspector-field">
+            <div className="inspector-field-label">Smoothing</div>
+            <div className="seg-ctrl">
+              {([50, 100, 200] as const).map((m) => (
+                <button
+                  key={m}
+                  className={`btn small${cfg.windowM === m ? ' primary' : ''}`}
+                  onClick={() => patch({ windowM: m })}
+                >
+                  {m}m
+                </button>
+              ))}
+            </div>
+          </div>
+        );
+
       case 'builtin:elevation':
         return (
           <div className="inspector-field">
@@ -110,10 +128,5 @@ export default function WidgetInspector({ instance }: Props) {
     }
   }
 
-  return (
-    <div className="sidebar-section" style={{ flexShrink: 0 }}>
-      <div className="sidebar-section-title">Properties</div>
-      <div className="inspector-fields">{renderFields()}</div>
-    </div>
-  );
+  return <div className="inspector-fields">{renderFields()}</div>;
 }

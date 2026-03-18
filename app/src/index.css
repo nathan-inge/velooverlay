@@ -156,7 +156,7 @@ body,
   border-right: 1px solid var(--border);
   display: flex;
   flex-direction: column;
-  overflow: hidden;
+  overflow-y: auto;
   flex-shrink: 0;
 }
 
@@ -200,7 +200,6 @@ body,
 
 .widget-instances {
   padding: 8px 0;
-  overflow-y: auto;
 }
 
 .widget-instance-row {
@@ -230,6 +229,26 @@ body,
 .widget-instance-type {
   font-size: 10px;
   color: var(--text-muted);
+}
+
+/* ── Inspector Panel (right side) ──────────────────────────── */
+.inspector-panel {
+  width: var(--sidebar-w);
+  background: var(--surface);
+  border-left: 1px solid var(--border);
+  display: flex;
+  flex-direction: column;
+  overflow-y: auto;
+  flex-shrink: 0;
+}
+
+.inspector-panel-title {
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+  padding: 10px 12px 0;
 }
 
 /* ── Widget Inspector ───────────────────────────────────────── */

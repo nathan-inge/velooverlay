@@ -25,6 +25,9 @@ export function makeMetricTileWidget(opts: {
 
       const value = frame.signalStatus === 'lost' ? null : opts.getValue(ctx);
 
+      c.shadowColor = 'rgba(0,0,0,0.9)';
+      c.shadowBlur = 6;
+
       // Label (top)
       c.fillStyle = 'rgba(255,255,255,0.6)';
       c.font = `${height * 0.18}px ${theme.fontFamily}`;

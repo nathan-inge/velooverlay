@@ -1,6 +1,5 @@
 import { useStore } from '../store/useStore';
 import type { WidgetCatalogEntry } from '../types';
-import WidgetInspector from './WidgetInspector';
 
 // The built-in widget catalogue — one entry per widget type.
 const CATALOG: WidgetCatalogEntry[] = [
@@ -46,6 +45,12 @@ const CATALOG: WidgetCatalogEntry[] = [
     defaultSize: { width: 140, height: 80 },
     defaultConfig: { unit: 'm' },
   },
+  {
+    type: 'builtin:gradient',
+    name: 'Gradient',
+    defaultSize: { width: 140, height: 80 },
+    defaultConfig: { windowM: 100 },
+  },
 ];
 
 const FONT_OPTIONS = [
@@ -59,7 +64,6 @@ const FONT_OPTIONS = [
 export default function WidgetPanel() {
   const { layout, selectedWidgetId, addWidget, removeWidget, selectWidget, updateTheme } = useStore();
 
-  const selectedWidget = layout.widgets.find((w) => w.id === selectedWidgetId) ?? null;
   const theme = layout.theme;
 
   return (
@@ -82,7 +86,7 @@ export default function WidgetPanel() {
 
       {/* Active widget instances */}
       {layout.widgets.length > 0 && (
-        <div className="sidebar-section" style={{ flex: 1, overflow: 'hidden', borderBottom: 'none' }}>
+        <div className="sidebar-section">
           <div className="sidebar-section-title">Layout ({layout.widgets.length})</div>
           <div className="widget-instances">
             {layout.widgets.map((w) => {
@@ -115,11 +119,8 @@ export default function WidgetPanel() {
         </div>
       )}
 
-      {/* Per-widget inspector */}
-      {selectedWidget && <WidgetInspector instance={selectedWidget} />}
-
-      {/* Theme section — always visible */}
-      <div className="sidebar-section" style={{ flexShrink: 0, borderBottom: 'none' }}>
+      {/* Theme section */}
+      <div className="sidebar-section" style={{ borderBottom: 'none' }}>
         <div className="sidebar-section-title">Theme</div>
         <div className="inspector-fields">
           <div className="inspector-field">

@@ -5,10 +5,15 @@ import { useDragDrop } from './hooks/useDragDrop';
 import Toolbar from './components/Toolbar';
 import WidgetPanel from './components/WidgetPanel';
 import Stage from './components/Stage/index';
+import WidgetInspector from './components/WidgetInspector';
 
 export default function App() {
   const init = useStore((s) => s.init);
+  const layout = useStore((s) => s.layout);
+  const selectedWidgetId = useStore((s) => s.selectedWidgetId);
   const { isDragOver } = useDragDrop();
+
+  const selectedWidget = layout.widgets.find((w) => w.id === selectedWidgetId) ?? null;
 
   useEffect(() => {
     void init();
@@ -20,6 +25,12 @@ export default function App() {
       <div className="app-body">
         <WidgetPanel />
         <Stage />
+        {selectedWidget && (
+          <div className="inspector-panel">
+            <div className="inspector-panel-title">Properties</div>
+            <WidgetInspector instance={selectedWidget} />
+          </div>
+        )}
       </div>
 
       {/* Full-window drop overlay */}
