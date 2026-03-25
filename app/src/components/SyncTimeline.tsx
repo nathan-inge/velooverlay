@@ -243,9 +243,24 @@ export default function SyncTimeline({ videoTimeMs, videoDurationMs, sessionDura
             </span>
           </div>
 
-          {/* Offset readout — always visible, updates live while dragging */}
-          <div className="sync-tl-offset-label">
-            offset&thinsp;{offsetMs >= 0 ? '+' : ''}{(offsetMs / 1000).toFixed(2)}s
+          {/* Offset readout with coarse +/- nudge buttons */}
+          <div
+            className="sync-tl-offset-controls"
+            onMouseDown={e => e.stopPropagation()}
+          >
+            <button
+              className="sync-tl-nudge"
+              onClick={() => setOffsetMs(offsetMs - 1000)}
+              title="Decrease offset by 1 s"
+            >−</button>
+            <span>
+              offset&thinsp;{offsetMs >= 0 ? '+' : ''}{(offsetMs / 1000).toFixed(2)}s
+            </span>
+            <button
+              className="sync-tl-nudge"
+              onClick={() => setOffsetMs(offsetMs + 1000)}
+              title="Increase offset by 1 s"
+            >+</button>
           </div>
         </div>
 

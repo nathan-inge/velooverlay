@@ -75,13 +75,19 @@ pub fn probe(path: &Path) -> Result<VideoMetadata> {
         })
         .unwrap_or(30.0);
 
+    // Priority:
+    // 1. `com.apple.quicktime.creationdate` — preserved by iMovie/Apple apps
+    //    even after editing; reflects the original camera recording time.
+    // 2. `creation_time` — reset to export time by iMovie on edited videos.
     let recorded_start_time: Option<DateTime<Utc>> = probe
         .format
         .tags
         .as_ref()
-        .and_then(|t| t.get("creation_time"))
-        .and_then(|s| DateTime::parse_from_rfc3339(s).ok())
-        .map(|dt: chrono::DateTime<chrono::FixedOffset>| dt.with_timezone(&Utc));
+        .and_then(|t| {
+            t.get("com.apple.quicktime.creationdate")
+                .or_else(|| t.get("creation_time"))
+        })
+        .and_then(|s| parse_datetime(s));
 
     Ok(VideoMetadata {
         path: path.to_path_buf(),
@@ -89,6 +95,26 @@ pub fn probe(path: &Path) -> Result<VideoMetadata> {
         frame_rate,
         recorded_start_time,
     })
+}
+
+/// Parse a datetime string that may be RFC 3339 (`+00:00`) or the Apple/GoPro
+/// variant that omits the colon (`+0000`).
+fn parse_datetime(s: &str) -> Option<DateTime<Utc>> {
+    if let Ok(dt) = DateTime::parse_from_rfc3339(s) {
+        return Some(dt.with_timezone(&Utc));
+    }
+    // Normalize "+HHMM" → "+HH:MM" then retry.
+    if s.len() > 5 {
+        let (body, tail) = s.split_at(s.len() - 5);
+        let b = tail.as_bytes();
+        if (b[0] == b'+' || b[0] == b'-') && b[1..].iter().all(|c| c.is_ascii_digit()) {
+            let normalized = format!("{}{}{}:{}", body, tail[..1].to_string(), &tail[1..3], &tail[3..5]);
+            if let Ok(dt) = DateTime::parse_from_rfc3339(&normalized) {
+                return Some(dt.with_timezone(&Utc));
+            }
+        }
+    }
+    None
 }
 
 fn parse_frame_rate(s: &str) -> f32 {

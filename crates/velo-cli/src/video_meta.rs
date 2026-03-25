@@ -82,15 +82,22 @@ pub fn probe(path: &Path, fps_override: Option<f32>) -> Result<VideoMetadata> {
 
     let frame_rate = fps_override.unwrap_or(detected_fps);
 
-    // Try to parse the creation_time tag (present on GoPro, DJI, most cameras).
-    // Format: "2026-03-09T17:13:14.000000Z"
+    // Try to parse the recording start time from format tags.
+    //
+    // Priority:
+    // 1. `com.apple.quicktime.creationdate` — preserved by iMovie and Apple
+    //    apps even after editing/export; reflects the original recording time.
+    // 2. `creation_time` — standard tag present on GoPro, DJI, most cameras,
+    //    but reset to the *export* time when a video is edited in iMovie.
     let recorded_start_time: Option<DateTime<Utc>> = probe
         .format
         .tags
         .as_ref()
-        .and_then(|t| t.get("creation_time"))
-        .and_then(|s| DateTime::parse_from_rfc3339(s).ok())
-        .map(|dt: chrono::DateTime<chrono::FixedOffset>| dt.with_timezone(&Utc));
+        .and_then(|t| {
+            t.get("com.apple.quicktime.creationdate")
+                .or_else(|| t.get("creation_time"))
+        })
+        .and_then(|s| parse_datetime(s));
 
     Ok(VideoMetadata {
         path: path.to_path_buf(),
@@ -98,6 +105,26 @@ pub fn probe(path: &Path, fps_override: Option<f32>) -> Result<VideoMetadata> {
         frame_rate,
         recorded_start_time,
     })
+}
+
+/// Parse a datetime string that may be RFC 3339 (`+00:00`) or the variant
+/// written by Apple/GoPro firmwares that omits the colon (`+0000`).
+fn parse_datetime(s: &str) -> Option<DateTime<Utc>> {
+    if let Ok(dt) = DateTime::parse_from_rfc3339(s) {
+        return Some(dt.with_timezone(&Utc));
+    }
+    // Normalize "+HHMM" → "+HH:MM" then retry.
+    if s.len() > 5 {
+        let (body, tail) = s.split_at(s.len() - 5);
+        let b = tail.as_bytes();
+        if (b[0] == b'+' || b[0] == b'-') && b[1..].iter().all(|c| c.is_ascii_digit()) {
+            let normalized = format!("{}{}{}:{}", body, tail[..1].to_string(), &tail[1..3], &tail[3..5]);
+            if let Ok(dt) = DateTime::parse_from_rfc3339(&normalized) {
+                return Some(dt.with_timezone(&Utc));
+            }
+        }
+    }
+    None
 }
 
 /// Parse a frame rate string like "30/1" or "60000/1001" into f32.
