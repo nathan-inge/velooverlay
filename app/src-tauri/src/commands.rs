@@ -232,6 +232,8 @@ pub fn compute_auto_sync(
 }
 
 /// Probe the video and spawn FFmpeg, returning a session ID for subsequent calls.
+///
+/// `encoder`: `"balanced"` | `"fast"` | `"hardware"` — see `render::start_export`.
 #[tauri::command]
 pub fn start_export_session(
     state: tauri::State<crate::render::ExportState>,
@@ -239,8 +241,9 @@ pub fn start_export_session(
     output_path: String,
     width: u32,
     height: u32,
+    encoder: String,
 ) -> Result<String, String> {
-    crate::render::start_export(&video_path, &output_path, width, height, &state)
+    crate::render::start_export(&video_path, &output_path, width, height, &encoder, &state)
         .map_err(|e| e.to_string())
 }
 

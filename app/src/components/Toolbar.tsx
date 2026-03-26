@@ -1,6 +1,6 @@
 import { useRef, useEffect } from 'react';
 import { useStore } from '../store/useStore';
-import type { ExportResolution } from '../store/useStore';
+import type { ExportResolution, ExportEncoder } from '../store/useStore';
 import logo from '../assets/logo.png';
 
 function formatEta(ms: number): string {
@@ -18,6 +18,12 @@ const RESOLUTION_OPTIONS: { value: ExportResolution; label: string }[] = [
   { value: '4k',     label: '4K'    },
 ];
 
+const ENCODER_OPTIONS: { value: ExportEncoder; label: string }[] = [
+  { value: 'balanced', label: 'Balanced' },
+  { value: 'fast',     label: 'Fast'     },
+  { value: 'hardware', label: 'Hardware' },
+];
+
 export default function Toolbar() {
   const {
     videoPath,
@@ -33,6 +39,8 @@ export default function Toolbar() {
     exportVideo,
     cancelExport,
     setExportResolution,
+    exportEncoder,
+    setExportEncoder,
   } = useStore();
 
   const canExport = !!videoPath && !!telemetryPath && frames.length > 0 && !isExporting;
@@ -115,6 +123,18 @@ export default function Toolbar() {
         style={{ fontSize: 12, padding: '3px 6px' }}
       >
         {RESOLUTION_OPTIONS.map((o) => (
+          <option key={o.value} value={o.value}>{o.label}</option>
+        ))}
+      </select>
+
+      <select
+        className="btn"
+        value={exportEncoder}
+        onChange={(e) => setExportEncoder(e.target.value as ExportEncoder)}
+        disabled={isExporting}
+        style={{ fontSize: 12, padding: '3px 6px' }}
+      >
+        {ENCODER_OPTIONS.map((o) => (
           <option key={o.value} value={o.value}>{o.label}</option>
         ))}
       </select>

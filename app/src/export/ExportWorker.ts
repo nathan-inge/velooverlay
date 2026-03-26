@@ -126,19 +126,21 @@ function buildVideoRoute(frames: TelemetryFrameDto[]): RouteData {
 }
 
 // The GUI stage is always 1920×1080 logical pixels. Widget positions and sizes
-// are expressed in that coordinate space. When exporting at a different resolution
-// we scale everything proportionally so widgets stay in the same relative position.
+// are expressed in that coordinate space.
+//
+// The overlay is always rendered at stage resolution (1920×1080) regardless of
+// the output resolution. Encoding a 4K OffscreenCanvas to PNG takes ~50ms/frame
+// (WebKit PNG encoder); at 1080p it takes ~10ms. FFmpeg upscales the overlay to
+// the output resolution in the filter_complex before compositing, so widget
+// quality at 4K output is nearly identical to rendering natively at 4K.
 const STAGE_W = 1920;
 const STAGE_H = 1080;
 
 // ── Export loop ───────────────────────────────────────────────────────────────
 
 async function runExport(msg: StartMessage) {
-  const { frames, route, layout, width, height } = msg;
+  const { frames, route, layout } = msg;
   const total = frames.length;
-
-  const scaleX = width / STAGE_W;
-  const scaleY = height / STAGE_H;
 
   const sdkRoute = toRouteData(route);
   const sdkVideoRoute = buildVideoRoute(frames);
@@ -148,30 +150,29 @@ async function runExport(msg: StartMessage) {
     backgroundOpacity: layout.theme.backgroundOpacity,
   };
 
-  // Composite canvas — the full output overlay frame
-  const compositeCanvas = new OffscreenCanvas(width, height);
+  // Composite canvas is always at stage resolution.
+  const compositeCanvas = new OffscreenCanvas(STAGE_W, STAGE_H);
   const compositeCtx = compositeCanvas.getContext('2d')!;
 
   // Per-widget canvases — reused across frames, recreated on size change.
-  // Canvases are sized in output pixels (scaled from stage coordinates).
   const widgetCanvases = new Map<string, OffscreenCanvas>();
 
   for (let i = 0; i < total; i++) {
     if (aborted) break;
 
-    compositeCtx.clearRect(0, 0, width, height);
+    compositeCtx.clearRect(0, 0, STAGE_W, STAGE_H);
     const sdkFrame = toSdkFrame(frames[i]);
 
     for (const instance of layout.widgets) {
       const widget = WIDGET_REGISTRY[instance.type];
       if (!widget) continue;
 
-      const ww = Math.round(instance.size.width * scaleX);
-      const wh = Math.round(instance.size.height * scaleY);
-      const wx = Math.round(instance.position.x * scaleX);
-      const wy = Math.round(instance.position.y * scaleY);
+      const ww = instance.size.width;
+      const wh = instance.size.height;
+      const wx = instance.position.x;
+      const wy = instance.position.y;
 
-      // Get or create per-widget OffscreenCanvas (output-resolution sized)
+      // Get or create per-widget OffscreenCanvas at stage-coordinate size.
       let wCanvas = widgetCanvases.get(instance.id);
       if (!wCanvas || wCanvas.width !== ww || wCanvas.height !== wh) {
         wCanvas = new OffscreenCanvas(ww, wh);

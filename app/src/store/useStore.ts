@@ -26,6 +26,7 @@ const TELEMETRY_FILTERS = [{ name: 'Telemetry', extensions: ['fit', 'gpx', 'tcx'
 const VIDEO_OUTPUT_FILTERS = [{ name: 'Video', extensions: ['mp4'] }];
 
 export type ExportResolution = 'source' | '1080p' | '1440p' | '4k';
+export type ExportEncoder   = 'balanced' | 'fast' | 'hardware';
 
 function resolveOutputSize(
   resolution: ExportResolution,
@@ -64,12 +65,14 @@ interface AppState {
   exportError: string | null;
   exportProgress: { done: number; total: number } | null;
   exportResolution: ExportResolution;
+  exportEncoder: ExportEncoder;
   isSyncing: boolean;
   syncMessage: string | null;
 
   // Actions
   init: () => Promise<void>;
   setExportResolution: (r: ExportResolution) => void;
+  setExportEncoder: (e: ExportEncoder) => void;
   // File import — dialog
   importVideo: () => Promise<void>;
   importTelemetry: () => Promise<void>;
@@ -111,6 +114,7 @@ export const useStore = create<AppState>((set, get) => ({
   exportError: null,
   exportProgress: null,
   exportResolution: 'source' as ExportResolution,
+  exportEncoder: 'balanced' as ExportEncoder,
   isSyncing: false,
   syncMessage: null,
 
@@ -257,10 +261,11 @@ export const useStore = create<AppState>((set, get) => ({
   },
 
   setExportResolution: (r) => set({ exportResolution: r }),
+  setExportEncoder: (e) => set({ exportEncoder: e }),
 
   // ── Export ──────────────────────────────────────────────────────
   exportVideo: async () => {
-    const { videoPath, frames, route, layout, exportResolution, videoMetadata } = get();
+    const { videoPath, frames, route, layout, exportResolution, exportEncoder, videoMetadata } = get();
     const { width, height } = resolveOutputSize(exportResolution, videoMetadata);
     if (!videoPath || frames.length === 0) return;
 
@@ -275,7 +280,7 @@ export const useStore = create<AppState>((set, get) => ({
 
     let sessionId: string;
     try {
-      sessionId = await invoke<string>('start_export_session', { videoPath, outputPath, width, height });
+      sessionId = await invoke<string>('start_export_session', { videoPath, outputPath, width, height, encoder: exportEncoder });
     } catch (e) {
       set({ exportError: String(e) });
       return;
