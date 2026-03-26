@@ -227,23 +227,46 @@ pub fn compute_auto_sync(
     Ok(result.offset_ms)
 }
 
-/// Burn widget overlays onto the video using FFmpeg and write to `output_path`.
-/// `layout_json` is the serialised layout.json from the frontend.
-/// This runs synchronously (on Tauri's thread pool) — can take several minutes.
+/// Probe the video and spawn FFmpeg, returning a session ID for subsequent calls.
 #[tauri::command]
-pub fn export_video(
+pub fn start_export_session(
+    state: tauri::State<crate::render::ExportState>,
     video_path: String,
-    telemetry_path: String,
-    offset_ms: i64,
-    layout_json: String,
     output_path: String,
+) -> Result<String, String> {
+    crate::render::start_export(&video_path, &output_path, &state).map_err(|e| e.to_string())
+}
+
+/// Write one PNG-encoded overlay frame to FFmpeg stdin.
+///
+/// `frame_b64` is a base64-encoded PNG. PNG encoding on the JS side compresses
+/// the mostly-transparent overlay from ~8 MB raw RGBA to ~50–200 KB, cutting
+/// IPC serialisation cost by ~100× versus a JSON number array.
+#[tauri::command]
+pub fn write_frame(
+    state: tauri::State<crate::render::ExportState>,
+    session_id: String,
+    frame_b64: String,
 ) -> Result<(), String> {
-    crate::render::export(
-        Path::new(&video_path),
-        Path::new(&telemetry_path),
-        offset_ms,
-        &layout_json,
-        Path::new(&output_path),
-    )
-    .map_err(|e| e.to_string())
+    use base64::{Engine as _, engine::general_purpose::STANDARD};
+    let frame = STANDARD.decode(&frame_b64).map_err(|e| e.to_string())?;
+    crate::render::write_frame(&session_id, frame, &state).map_err(|e| e.to_string())
+}
+
+/// Drop FFmpeg stdin (EOF) and wait for it to finish muxing.
+#[tauri::command]
+pub fn finish_export(
+    state: tauri::State<crate::render::ExportState>,
+    session_id: String,
+) -> Result<(), String> {
+    crate::render::finish_export(&session_id, &state).map_err(|e| e.to_string())
+}
+
+/// Kill FFmpeg immediately and remove the session.
+#[tauri::command]
+pub fn abort_export(
+    state: tauri::State<crate::render::ExportState>,
+    session_id: String,
+) {
+    crate::render::abort_export(&session_id, &state);
 }

@@ -12,6 +12,7 @@ pub fn draw_widget(
     frame: &TelemetryFrame,
     all_frames: &[TelemetryFrame],
     full_track_points: &[(f64, f64, Option<f32>)],
+    raw_route_points: &[(f32, f32)],
     theme: &Theme,
     font: Option<&Font>,
 ) {
@@ -32,7 +33,7 @@ pub fn draw_widget(
             metric_tile::draw_elevation(pixmap, widget, frame, theme, font)
         }
         "builtin:gradient" => {
-            metric_tile::draw_gradient(pixmap, widget, frame, all_frames, theme, font)
+            metric_tile::draw_gradient(pixmap, widget, frame, raw_route_points, theme, font)
         }
         _ => draw_unknown_placeholder(pixmap, widget),
     }

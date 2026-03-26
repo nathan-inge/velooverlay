@@ -45,7 +45,7 @@ brew install ffmpeg
 
 ## Quick start
 
-### Desktop app (GUI)
+### Desktop app
 
 ```bash
 # Install JS dependencies (monorepo workspaces)
@@ -56,14 +56,7 @@ cd app
 cargo tauri dev
 ```
 
-When you launch the app:
-
-- **Import Video**: choose an MP4 from your camera.
-- **Import Telemetry**: choose a `.fit` activity (Garmin / Wahoo / etc.).
-- **Edit layout**: add widgets, position them, tweak settings.
-- **Export MP4**: renders and re-encodes the final video (requires FFmpeg).
-
-### CLI
+### CLI (`velooverlay process`)
 
 ```bash
 # Build the CLI
@@ -73,7 +66,7 @@ cargo build -p velooverlay
 cargo run -p velooverlay -- --help
 ```
 
-If you prefer an installed binary (local checkout):
+Install a local binary:
 
 ```bash
 cargo install --path crates/velo-cli
@@ -85,14 +78,17 @@ velooverlay --help
 ```
 velooverlay/
 ├── crates/
-│   ├── velo-core/        # Rust library: telemetry parsing, sync, interpolation
-│   └── velo-cli/         # CLI binary: `velooverlay` command
+│   ├── velo-core/          # Rust library: telemetry parsing, sync, interpolation
+│   └── velo-cli/           # CLI binary: `velooverlay process`
 ├── app/
-│   ├── src-tauri/        # Tauri Rust backend
-│   └── src/              # React/TypeScript frontend
+│   ├── src-tauri/          # Tauri Rust backend (FFmpeg session management)
+│   └── src/
+│       ├── export/         # ExportWorker.ts (OffscreenCanvas rendering) + widget registry
+│       ├── components/     # React UI components
+│       └── store/          # Zustand state (useStore.ts)
 └── packages/
-    ├── widget-sdk/        # TypeScript widget interface (published to npm)
-    └── widgets-builtin/   # Built-in widgets (Speedometer, Snake Map, HR, Cadence, Power)
+    ├── widget-sdk/          # TypeScript widget interface (public API)
+    └── widgets-builtin/     # Built-in widgets (Canvas 2D — used by preview and export)
 ```
 
 ---
@@ -117,7 +113,7 @@ npm run build --workspace=packages/widgets-builtin
 
 ---
 
-## CLI Usage (Phase 0)
+## CLI Usage
 
 Build and run the CLI:
 
@@ -127,15 +123,6 @@ cargo build --package velooverlay
 # Or run directly without a separate build step:
 cargo run --package velooverlay -- --help
 ```
-
-### Sync modes
-
-Both `process` and `render` support two sync modes, controlled by `--sync`:
-
-| Mode | Flag | Behaviour |
-|---|---|---|
-| **Auto** (default) | `--sync auto` | Reads the `creation_time` tag from the video file and the `start_time` from the telemetry file and computes the offset automatically. Requires both files to contain embedded timestamps (GoPro, DJI, and Garmin devices all do). Falls back to `--offset-ms 0` with a warning if either timestamp is missing. |
-| **Manual** | `--sync manual --offset-ms <MS>` | Uses a fixed millisecond offset you provide. Positive = telemetry starts after the video; negative = telemetry starts before the video (the typical case when the video is a clip from mid-ride). |
 
 ### Commands
 
@@ -168,65 +155,20 @@ cargo run --package velooverlay -- process \
   --output telemetry.json
 ```
 
-**render** — Burn widget overlay onto video (requires FFmpeg):
+#### Sync modes (`--sync`)
 
-```bash
-# Auto-sync (recommended)
-cargo run --package velooverlay -- render \
-  --video ride.mp4 \
-  --telemetry ride.fit \
-  --layout layout.json \
-  --output output.mp4
-
-# Manual offset
-cargo run --package velooverlay -- render \
-  --video ride.mp4 \
-  --telemetry ride.fit \
-  --layout layout.json \
-  --sync manual \
-  --offset-ms -5200 \
-  --output output.mp4
-
-# Reduce output file size (higher CRF = smaller file, lower quality)
-cargo run --package velooverlay -- render \
-  --video ride.mp4 \
-  --telemetry ride.fit \
-  --layout layout.json \
-  --crf 28 \
-  --output output.mp4
-```
-
-**Output file size:** The render command re-encodes the video stream (unavoidable when compositing). The default `--crf 23` matches FFmpeg's built-in default and may produce a larger file than your source if the original was recorded in H.265 or at a lower bitrate. Use `--crf 28` for a noticeably smaller file at slightly lower quality, or `--crf 18` for near-lossless output.
-
-| `--crf` | Quality | Typical use |
+| Mode | Flag | Behaviour |
 |---|---|---|
-| 18 | Near-lossless | Archiving, further editing |
-| 23 | Default (good) | General sharing |
-| 28 | Smaller file | Web upload, messaging |
-| 35+ | Noticeably degraded | Not recommended |
+| **Auto** (default) | `--sync auto` | Reads the `creation_time` tag from the video and the `start_time` from the telemetry file and computes the offset automatically. Requires both files to have embedded timestamps (GoPro, DJI, and Garmin devices all do). Falls back to `--offset-ms 0` with a warning if either timestamp is missing. |
+| **Manual** | `--sync manual --offset-ms <MS>` | Uses a fixed millisecond offset. Positive = telemetry starts after the video; negative = telemetry starts before the video. |
 
-### Layout file
-
-The `--layout` argument points to a `layout.json` file that describes which widgets to show and where. See [`examples/layout.json`](examples/layout.json) for a full example.
-
-Built-in widget types (used in `layout.json` under each widget's `config` object):
-
-| Type | Config (JSON keys) | Rendered by CLI export (`velooverlay render` / GUI Export MP4)? |
-|---|---|---|
-| `builtin:speedometer` | `{"unit": "kph" \| "mph"}` (default: `kph`) | Yes |
-| `builtin:heart-rate` | `{}` (no options) | Yes |
-| `builtin:cadence` | `{}` (no options) | Yes |
-| `builtin:power` | `{}` (no options) | Yes |
-| `builtin:snake-map` | `{"full_track": true \| false}` (default: `false`) | Yes |
-| `builtin:elevation-profile` | `{"full_track": true \| false}` (default: `false`) | Yes |
-| `builtin:elevation` | `{"unit": "m" \| "ft"}` (GUI preview only; see note below) | No |
-| `builtin:gradient` | `{"windowM": number}` (GUI preview only; see note below) | No |
-
-Note: the GUI may expose additional per-widget options (for example, `padding`) that are not currently consumed by the Rust CLI renderer. If you’re preparing a `layout.json` for CLI export, prefer the keys listed above.
+> **`velooverlay render` is deprecated.** Video rendering is handled by the desktop app, which produces pixel-perfect output matching the GUI preview. Run `velooverlay render --help` for migration guidance.
 
 ---
 
-## Desktop App (Phase 1)
+## Desktop App
+
+The desktop app is the primary way to create overlay videos. It handles sync, layout editing, preview, and export in one place.
 
 ```bash
 # Run in development mode (hot-reload)
@@ -237,6 +179,31 @@ cargo tauri dev
 cd app
 cargo tauri build
 ```
+
+### Workflow
+
+1. **Import Video** — choose an MP4 or MOV from your camera.
+2. **Import Telemetry** — choose a `.fit`, `.gpx`, or `.tcx` activity file.
+3. **Sync** — the app auto-syncs using embedded timestamps if available. Use the offset slider for manual adjustment.
+4. **Add widgets** — drag widgets from the sidebar onto the stage and resize/reposition them.
+5. **Export MP4** — renders the overlay and re-encodes the video via FFmpeg. A progress counter shows frames rendered; click **Cancel** to abort at any time.
+
+### Widgets
+
+All built-in widgets work in both the live preview and the exported video:
+
+| Widget | Type ID | Config options |
+|---|---|---|
+| Speedometer | `builtin:speedometer` | `unit`: `"kph"` or `"mph"` (default: `"kph"`) |
+| Heart Rate | `builtin:heart-rate` | — |
+| Cadence | `builtin:cadence` | — |
+| Power | `builtin:power` | — |
+| Elevation | `builtin:elevation` | `unit`: `"m"` or `"ft"` (default: `"m"`) |
+| Gradient | `builtin:gradient` | `windowM`: smoothing window in metres (default: `200`) |
+| Snake Map | `builtin:snake-map` | `fullTrack`: `true` shows the full activity route (default: `false`) |
+| Elevation Profile | `builtin:elevation-profile` | `fullTrack`: `true` shows the full activity route (default: `false`) |
+
+> **Note:** macOS 13 (Ventura) or newer is required for video export. The export pipeline uses `OffscreenCanvas`, which was added to WebKit in Safari 16.4.
 
 ---
 

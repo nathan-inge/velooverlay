@@ -1,30 +1,9 @@
 import { useEffect, useRef, useCallback } from 'react';
 import type { RouteData, WidgetRenderContext, Theme } from '@velooverlay/widget-sdk';
-import {
-  SpeedometerWidget,
-  SnakeMapWidget,
-  ElevationProfileWidget,
-  HeartRateWidget,
-  CadenceWidget,
-  PowerWidget,
-  ElevationWidget,
-  GradientWidget,
-} from '@velooverlay/widgets-builtin';
-import type { WidgetDefinition } from '@velooverlay/widget-sdk';
 import type { TelemetryFrameDto, WidgetInstance, RouteDataDto } from '../../types';
 import { findFrameAtTime } from '../../hooks/useTelemetryAtTime';
 import { useStore } from '../../store/useStore';
-
-const WIDGET_REGISTRY: Record<string, WidgetDefinition> = {
-  'builtin:speedometer': SpeedometerWidget,
-  'builtin:snake-map': SnakeMapWidget,
-  'builtin:elevation-profile': ElevationProfileWidget,
-  'builtin:heart-rate': HeartRateWidget,
-  'builtin:cadence': CadenceWidget,
-  'builtin:power': PowerWidget,
-  'builtin:elevation': ElevationWidget,
-  'builtin:gradient': GradientWidget,
-};
+import { WIDGET_REGISTRY } from '../../export/widgetRegistry';
 
 const SNAP = 10;
 function snap(v: number) {

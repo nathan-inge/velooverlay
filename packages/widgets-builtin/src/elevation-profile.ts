@@ -34,7 +34,7 @@ export const ElevationProfileWidget: WidgetDefinition<ElevationProfileConfig> = 
 
     // Only use points that have altitude data
     const pts = activeRoute.points.filter(
-      (p): p is { lat: number; lon: number; altitudeM: number } => p.altitudeM !== null,
+      (p): p is { lat: number; lon: number; altitudeM: number; distanceM: number | null } => p.altitudeM !== null,
     );
     if (pts.length < 2) return;
 

@@ -8,10 +8,12 @@ export default function Toolbar() {
     ffmpegAvailable,
     isProcessing,
     isExporting,
+    exportProgress,
     frames,
     importVideo,
     importTelemetry,
     exportVideo,
+    cancelExport,
   } = useStore();
 
   const canExport = !!videoPath && !!telemetryPath && frames.length > 0 && !isExporting;
@@ -50,13 +52,25 @@ export default function Toolbar() {
 
       <div className="toolbar-sep" />
 
-      <button
-        className="btn primary"
-        onClick={() => void exportVideo()}
-        disabled={!canExport || !ffmpegAvailable}
-      >
-        {isExporting ? 'Exporting…' : '⬇ Export MP4'}
-      </button>
+      {isExporting && exportProgress && (
+        <span style={{ fontSize: 11, color: '#aaa' }}>
+          {exportProgress.done} / {exportProgress.total} frames
+        </span>
+      )}
+
+      {isExporting ? (
+        <button className="btn" onClick={cancelExport}>
+          ✕ Cancel
+        </button>
+      ) : (
+        <button
+          className="btn primary"
+          onClick={() => void exportVideo()}
+          disabled={!canExport || !ffmpegAvailable}
+        >
+          ⬇ Export MP4
+        </button>
+      )}
     </div>
   );
 }

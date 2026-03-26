@@ -37,7 +37,7 @@ pub fn draw_gradient(
     pixmap: &mut Pixmap,
     widget: &WidgetInstance,
     frame: &TelemetryFrame,
-    all_frames: &[TelemetryFrame],
+    raw_route_points: &[(f32, f32)],
     theme: &Theme,
     font: Option<&Font>,
 ) {
@@ -50,8 +50,11 @@ pub fn draw_gradient(
     let (value_str, is_lost) = if frame.signal_status == SignalStatus::Lost {
         ("--".to_string(), true)
     } else {
-        match compute_gradient(all_frames, frame.frame_index as usize, window_m) {
-            Some(pct) => (format_pct(pct), false),
+        let pct = frame.data.distance_m.zip(frame.data.altitude_m).and_then(
+            |(dist, alt)| compute_gradient(raw_route_points, dist, alt, window_m),
+        );
+        match pct {
+            Some(p) => (format_pct(p), false),
             None => ("--".to_string(), true),
         }
     };
@@ -257,44 +260,44 @@ fn draw_metric_horizontal(
 }
 
 // ---------------------------------------------------------------------------
-// Gradient calculation (ported from packages/widgets-builtin/src/metric-tile-gradient.ts)
+// Gradient calculation (matches packages/widgets-builtin/src/metric-tile-gradient.ts)
 // ---------------------------------------------------------------------------
 
-/// Compute road gradient (%) from the interpolated frame history.
+/// Compute road gradient (%) from raw GPS route points.
 ///
-/// Uses a least-squares regression over `window_m` metres of history,
-/// matching the TypeScript distance-based path.  Falls back to `None` when
-/// there is insufficient history or when distance data is absent.
-fn compute_gradient(all_frames: &[TelemetryFrame], current_idx: usize, window_m: f32) -> Option<f32> {
-    if current_idx == 0 || all_frames.is_empty() {
-        return None;
-    }
-
-    let current = &all_frames[current_idx];
-    let current_dist = current.data.distance_m?;
-    let current_alt = current.data.altitude_m?;
-
+/// `raw_route_points` is a slice of `(distanceM, altitudeM)` pairs extracted
+/// directly from `TelemetrySession.points` — the same sparse 1 Hz samples that
+/// the TypeScript GUI widget receives as `route.points`.  Using raw samples
+/// (rather than the dense 30 fps interpolated frames) ensures the box-filter
+/// window covers a realistic distance, matching the GUI output exactly.
+fn compute_gradient(
+    raw_route_points: &[(f32, f32)],
+    current_dist: f32,
+    current_alt: f32,
+    window_m: f32,
+) -> Option<f32> {
     const MIN_POINTS: usize = 20;
 
-    // Collect (distance, altitude) pairs from frames *before* the current one.
-    let before: Vec<(f32, f32)> = all_frames[..current_idx]
+    // Collect route points strictly before the current position, sorted by
+    // distanceM — mirrors the TypeScript `.filter(...).sort(...)` step.
+    let mut before: Vec<(f32, f32)> = raw_route_points
         .iter()
-        .filter_map(|f| Some((f.data.distance_m?, f.data.altitude_m?)))
+        .copied()
+        .filter(|(d, _)| *d < current_dist)
         .collect();
+    before.sort_by(|a, b| a.0.partial_cmp(&b.0).unwrap_or(std::cmp::Ordering::Equal));
 
     if before.is_empty() {
         return None;
     }
 
-    // Walk backwards until we have `window_m` metres AND `MIN_POINTS` samples.
+    // Walk backwards from the most-recent point until both the distance
+    // threshold AND the minimum point count are satisfied.
     let mut start_idx = before.len() - 1;
-    loop {
+    while start_idx > 0 {
         let covered = current_dist - before[start_idx].0;
         let count = before.len() - start_idx + 1; // +1 for current frame
         if covered >= window_m && count >= MIN_POINTS {
-            break;
-        }
-        if start_idx == 0 {
             break;
         }
         start_idx -= 1;
@@ -308,6 +311,7 @@ fn compute_gradient(all_frames: &[TelemetryFrame], current_idx: usize, window_m:
 
     let start_dist = window[0].0;
 
+    // xs: distance from window start.  Current frame is the final point.
     let mut xs: Vec<f32> = window.iter().map(|(d, _)| d - start_dist).collect();
     xs.push(current_dist - start_dist);
 

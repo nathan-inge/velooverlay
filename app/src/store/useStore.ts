@@ -9,6 +9,7 @@ import type {
   VideoMetadataDto,
   WidgetInstance,
 } from '../types';
+import type { StartMessage } from '../export/ExportWorker';
 
 const DEFAULT_LAYOUT: Layout = {
   schema_version: '1',
@@ -30,6 +31,10 @@ function generateId(): string {
 
 let reprocessTimeout: ReturnType<typeof setTimeout> | null = null;
 
+// Module-level refs — not in Zustand state because Workers are not serializable.
+let activeExportWorker: Worker | null = null;
+let activeExportSessionId: string | null = null;
+
 interface AppState {
   videoPath: string | null;
   telemetryPath: string | null;
@@ -45,6 +50,7 @@ interface AppState {
   ffmpegAvailable: boolean;
   isExporting: boolean;
   exportError: string | null;
+  exportProgress: { done: number; total: number } | null;
   isSyncing: boolean;
   syncMessage: string | null;
 
@@ -71,6 +77,7 @@ interface AppState {
   updateTheme: (patch: Partial<Layout['theme']>) => void;
   // Export
   exportVideo: () => Promise<void>;
+  cancelExport: () => void;
 }
 
 export const useStore = create<AppState>((set, get) => ({
@@ -88,6 +95,7 @@ export const useStore = create<AppState>((set, get) => ({
   ffmpegAvailable: false,
   isExporting: false,
   exportError: null,
+  exportProgress: null,
   isSyncing: false,
   syncMessage: null,
 
@@ -235,35 +243,114 @@ export const useStore = create<AppState>((set, get) => ({
 
   // ── Export ──────────────────────────────────────────────────────
   exportVideo: async () => {
-    const { videoPath, telemetryPath, offsetMs, layout } = get();
-    if (!videoPath || !telemetryPath) return;
+    const { videoPath, frames, route, layout } = get();
+    if (!videoPath || frames.length === 0) return;
 
     const outputPath = await save({ filters: VIDEO_OUTPUT_FILTERS, defaultPath: 'output.mp4' });
     if (!outputPath) return;
 
-    // The Rust Layout struct (and CLI layout.json format) uses snake_case theme
-    // keys. Convert before serializing so serde can parse the JSON correctly.
-    const layoutForExport = {
-      ...layout,
-      theme: {
-        font_family: layout.theme.fontFamily,
-        primary_color: layout.theme.primaryColor,
-        background_opacity: layout.theme.backgroundOpacity,
-      },
-    };
-
-    set({ isExporting: true, exportError: null });
-    try {
-      await invoke('export_video', {
-        videoPath,
-        telemetryPath,
-        offsetMs,
-        layoutJson: JSON.stringify(layoutForExport),
-        outputPath,
-      });
-      set({ isExporting: false });
-    } catch (e) {
-      set({ isExporting: false, exportError: String(e) });
+    // Check OffscreenCanvas availability (requires macOS 13+ / WebKit 16.4+)
+    if (typeof OffscreenCanvas === 'undefined') {
+      set({ exportError: 'Export requires macOS 13 or newer (OffscreenCanvas is not available in this WebView).' });
+      return;
     }
+
+    let sessionId: string;
+    try {
+      sessionId = await invoke<string>('start_export_session', { videoPath, outputPath });
+    } catch (e) {
+      set({ exportError: String(e) });
+      return;
+    }
+
+    activeExportSessionId = sessionId;
+    const total = frames.length;
+    set({ isExporting: true, exportError: null, exportProgress: { done: 0, total } });
+
+    const worker = new Worker(new URL('../export/ExportWorker.ts', import.meta.url), {
+      type: 'module',
+    });
+    activeExportWorker = worker;
+
+    await new Promise<void>((resolve) => {
+      const cleanup = () => {
+        worker.terminate();
+        activeExportWorker = null;
+        activeExportSessionId = null;
+      };
+
+      worker.onmessage = async (e: MessageEvent) => {
+        const msg = e.data as { type: string; frameIndex?: number; data?: string; message?: string };
+
+        if (msg.type === 'frame') {
+          try {
+            await invoke('write_frame', { sessionId, frameB64: msg.data! });
+            set((state) => ({
+              exportProgress: state.exportProgress
+                ? { ...state.exportProgress, done: (msg.frameIndex ?? 0) + 1 }
+                : null,
+            }));
+            worker.postMessage({ type: 'ack' });
+          } catch (err) {
+            worker.postMessage({ type: 'abort' });
+            await invoke('abort_export', { sessionId }).catch(() => {});
+            set({ isExporting: false, exportProgress: null, exportError: String(err) });
+            cleanup();
+            resolve();
+          }
+        } else if (msg.type === 'done') {
+          try {
+            await invoke('finish_export', { sessionId });
+          } catch (err) {
+            set({ isExporting: false, exportProgress: null, exportError: String(err) });
+            cleanup();
+            resolve();
+            return;
+          }
+          set({ isExporting: false, exportProgress: null });
+          cleanup();
+          resolve();
+        } else if (msg.type === 'error') {
+          await invoke('abort_export', { sessionId }).catch(() => {});
+          set({ isExporting: false, exportProgress: null, exportError: msg.message ?? 'Unknown worker error' });
+          cleanup();
+          resolve();
+        }
+      };
+
+      worker.onerror = async (e) => {
+        await invoke('abort_export', { sessionId }).catch(() => {});
+        set({ isExporting: false, exportProgress: null, exportError: `Worker error: ${e.message}` });
+        cleanup();
+        resolve();
+      };
+
+      const startMsg: StartMessage = {
+        type: 'start',
+        frames,
+        route: route ?? { points: [], bounds: { minLat: 0, maxLat: 0, minLon: 0, maxLon: 0 } },
+        layout: {
+          theme: layout.theme,
+          widgets: layout.widgets,
+        },
+        width: 1920,
+        height: 1080,
+      };
+      worker.postMessage(startMsg);
+    });
+  },
+
+  cancelExport: () => {
+    const sessionId = activeExportSessionId;
+    if (activeExportWorker) {
+      activeExportWorker.postMessage({ type: 'abort' });
+      activeExportWorker.terminate();
+      activeExportWorker = null;
+    }
+    if (sessionId) {
+      void invoke('abort_export', { sessionId });
+      activeExportSessionId = null;
+    }
+    set({ isExporting: false, exportProgress: null });
   },
 }));

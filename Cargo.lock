@@ -4267,6 +4267,7 @@ name = "velo-app"
 version = "0.1.0"
 dependencies = [
  "anyhow",
+ "base64 0.22.1",
  "chrono",
  "serde",
  "serde_json",
@@ -4274,7 +4275,6 @@ dependencies = [
  "tauri-build",
  "tauri-plugin-dialog",
  "velo-core",
- "widgets-builtin",
 ]
 
 [[package]]
@@ -4299,7 +4299,6 @@ dependencies = [
  "serde",
  "serde_json",
  "velo-core",
- "widgets-builtin",
 ]
 
 [[package]]

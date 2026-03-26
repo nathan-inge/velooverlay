@@ -21,23 +21,31 @@ pub struct CliRenderer {
     /// GPS points (lat, lon, altitude_m) from the full activity file.
     /// Empty when not provided — widgets will fall back to video-only frames.
     full_track_points: Vec<(f64, f64, Option<f32>)>,
+    /// Raw (distanceM, altitudeM) pairs from TelemetrySession.points.
+    /// Used by the gradient widget to match the GUI's sparse-sample regression.
+    raw_route_points: Vec<(f32, f32)>,
 }
 
 impl CliRenderer {
     /// `full_track_points`: (lat, lon, altitude_m) triples from the complete
     /// `TelemetrySession`, pre-extracted before the video-sync step.
     /// Pass `vec![]` if unavailable.
+    ///
+    /// `raw_route_points`: (distanceM, altitudeM) pairs from `TelemetrySession.points`
+    /// (only entries where both fields are `Some`). Pass `vec![]` if unavailable.
     pub fn new(
         width: u32,
         height: u32,
         font: Option<Font>,
         full_track_points: Vec<(f64, f64, Option<f32>)>,
+        raw_route_points: Vec<(f32, f32)>,
     ) -> Self {
         Self {
             width,
             height,
             font,
             full_track_points,
+            raw_route_points,
         }
     }
 
@@ -61,6 +69,7 @@ impl CliRenderer {
                 frame,
                 all_frames,
                 &self.full_track_points,
+                &self.raw_route_points,
                 &layout.theme,
                 self.font.as_ref(),
             );
