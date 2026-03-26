@@ -1,6 +1,15 @@
+import { useRef, useEffect } from 'react';
 import { useStore } from '../store/useStore';
 import type { ExportResolution } from '../store/useStore';
 import logo from '../assets/logo.png';
+
+function formatEta(ms: number): string {
+  const s = Math.ceil(ms / 1000);
+  if (s < 60) return `${s}s`;
+  const m = Math.floor(s / 60);
+  const r = s % 60;
+  return r > 0 ? `${m}m ${r}s` : `${m}m`;
+}
 
 const RESOLUTION_OPTIONS: { value: ExportResolution; label: string }[] = [
   { value: 'source', label: 'Source' },
@@ -27,6 +36,24 @@ export default function Toolbar() {
   } = useStore();
 
   const canExport = !!videoPath && !!telemetryPath && frames.length > 0 && !isExporting;
+
+  // Track when the current export started so we can estimate time remaining.
+  const exportStartRef = useRef<number | null>(null);
+  useEffect(() => {
+    if (isExporting) exportStartRef.current = Date.now();
+  }, [isExporting]);
+
+  let progressPct = 0;
+  let etaText = '';
+  if (isExporting && exportProgress && exportProgress.total > 0) {
+    progressPct = exportProgress.done / exportProgress.total;
+    // Wait for a few frames before showing ETA so the initial estimate is stable.
+    if (exportProgress.done > 3 && exportStartRef.current !== null) {
+      const elapsed = Date.now() - exportStartRef.current;
+      const msRemaining = (elapsed / exportProgress.done) * (exportProgress.total - exportProgress.done);
+      etaText = formatEta(msRemaining);
+    }
+  }
 
   return (
     <div className="toolbar">
@@ -63,9 +90,21 @@ export default function Toolbar() {
       <div className="toolbar-sep" />
 
       {isExporting && exportProgress && (
-        <span style={{ fontSize: 11, color: '#aaa' }}>
-          {exportProgress.done} / {exportProgress.total} frames
-        </span>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 3, minWidth: 120 }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 11, color: '#aaa' }}>
+            <span>{Math.round(progressPct * 100)}%</span>
+            {etaText && <span>~{etaText}</span>}
+          </div>
+          <div style={{ height: 4, background: 'rgba(255,255,255,0.1)', borderRadius: 2, overflow: 'hidden' }}>
+            <div style={{
+              width: `${progressPct * 100}%`,
+              height: '100%',
+              background: '#00d1ff',
+              borderRadius: 2,
+              transition: 'width 0.15s ease',
+            }} />
+          </div>
+        </div>
       )}
 
       <select
