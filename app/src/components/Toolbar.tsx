@@ -1,5 +1,13 @@
 import { useStore } from '../store/useStore';
+import type { ExportResolution } from '../store/useStore';
 import logo from '../assets/logo.png';
+
+const RESOLUTION_OPTIONS: { value: ExportResolution; label: string }[] = [
+  { value: 'source', label: 'Source' },
+  { value: '1080p',  label: '1080p' },
+  { value: '1440p',  label: '1440p' },
+  { value: '4k',     label: '4K'    },
+];
 
 export default function Toolbar() {
   const {
@@ -9,11 +17,13 @@ export default function Toolbar() {
     isProcessing,
     isExporting,
     exportProgress,
+    exportResolution,
     frames,
     importVideo,
     importTelemetry,
     exportVideo,
     cancelExport,
+    setExportResolution,
   } = useStore();
 
   const canExport = !!videoPath && !!telemetryPath && frames.length > 0 && !isExporting;
@@ -57,6 +67,18 @@ export default function Toolbar() {
           {exportProgress.done} / {exportProgress.total} frames
         </span>
       )}
+
+      <select
+        className="btn"
+        value={exportResolution}
+        onChange={(e) => setExportResolution(e.target.value as ExportResolution)}
+        disabled={isExporting}
+        style={{ fontSize: 12, padding: '3px 6px' }}
+      >
+        {RESOLUTION_OPTIONS.map((o) => (
+          <option key={o.value} value={o.value}>{o.label}</option>
+        ))}
+      </select>
 
       {isExporting ? (
         <button className="btn" onClick={cancelExport}>

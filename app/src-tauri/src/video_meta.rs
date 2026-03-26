@@ -17,6 +17,8 @@ struct FfprobeStream {
     codec_type: Option<String>,
     r_frame_rate: Option<String>,
     avg_frame_rate: Option<String>,
+    width: Option<u32>,
+    height: Option<u32>,
 }
 
 #[derive(Deserialize)]
@@ -25,8 +27,25 @@ struct FfprobeFormat {
     tags: Option<HashMap<String, String>>,
 }
 
+/// Video dimensions extracted alongside the core metadata.
+pub struct VideoDimensions {
+    pub width: u32,
+    pub height: u32,
+}
+
+/// Run `ffprobe` on `path` and return `(VideoMetadata, VideoDimensions)`.
+/// The width/height default to 1920×1080 if ffprobe doesn't report them.
+pub fn probe_with_dimensions(path: &Path) -> Result<(VideoMetadata, VideoDimensions)> {
+    let (meta, dims) = probe_internal(path)?;
+    Ok((meta, dims))
+}
+
 /// Run `ffprobe` on `path` and return a `VideoMetadata`.
 pub fn probe(path: &Path) -> Result<VideoMetadata> {
+    probe_internal(path).map(|(m, _)| m)
+}
+
+fn probe_internal(path: &Path) -> Result<(VideoMetadata, VideoDimensions)> {
     let output = std::process::Command::new("ffprobe")
         .args([
             "-v",
@@ -61,10 +80,12 @@ pub fn probe(path: &Path) -> Result<VideoMetadata> {
 
     let duration_ms = (duration_secs * 1000.0).round() as u64;
 
-    let frame_rate = probe
+    let video_stream = probe
         .streams
         .iter()
-        .find(|s| s.codec_type.as_deref() == Some("video"))
+        .find(|s| s.codec_type.as_deref() == Some("video"));
+
+    let frame_rate = video_stream
         .and_then(|s| {
             // Prefer avg_frame_rate (actual display fps); r_frame_rate can be a
             // codec timebase like "90000/1" for VFR/screen recordings which
@@ -74,6 +95,11 @@ pub fn probe(path: &Path) -> Result<VideoMetadata> {
             avg.or(r)
         })
         .unwrap_or(30.0);
+
+    let dims = video_stream
+        .and_then(|s| s.width.zip(s.height))
+        .map(|(w, h)| VideoDimensions { width: w, height: h })
+        .unwrap_or(VideoDimensions { width: 1920, height: 1080 });
 
     // Priority:
     // 1. `com.apple.quicktime.creationdate` — preserved by iMovie/Apple apps
@@ -89,12 +115,15 @@ pub fn probe(path: &Path) -> Result<VideoMetadata> {
         })
         .and_then(|s| parse_datetime(s));
 
-    Ok(VideoMetadata {
-        path: path.to_path_buf(),
-        duration_ms,
-        frame_rate,
-        recorded_start_time,
-    })
+    Ok((
+        VideoMetadata {
+            path: path.to_path_buf(),
+            duration_ms,
+            frame_rate,
+            recorded_start_time,
+        },
+        dims,
+    ))
 }
 
 /// Parse a datetime string that may be RFC 3339 (`+00:00`) or the Apple/GoPro

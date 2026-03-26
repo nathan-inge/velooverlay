@@ -17,6 +17,8 @@ pub struct VideoMetadataDto {
     pub duration_ms: u64,
     pub frame_rate: f32,
     pub has_timestamp: bool,
+    pub width: u32,
+    pub height: u32,
 }
 
 #[derive(Serialize)]
@@ -87,11 +89,13 @@ pub fn check_ffmpeg() -> bool {
 #[tauri::command]
 pub fn get_video_metadata(video_path: String) -> Result<VideoMetadataDto, String> {
     let path = Path::new(&video_path);
-    let meta = crate::video_meta::probe(path).map_err(|e| e.to_string())?;
+    let (meta, dims) = crate::video_meta::probe_with_dimensions(path).map_err(|e| e.to_string())?;
     Ok(VideoMetadataDto {
         duration_ms: meta.duration_ms,
         frame_rate: meta.frame_rate,
         has_timestamp: meta.recorded_start_time.is_some(),
+        width: dims.width,
+        height: dims.height,
     })
 }
 
@@ -233,8 +237,11 @@ pub fn start_export_session(
     state: tauri::State<crate::render::ExportState>,
     video_path: String,
     output_path: String,
+    width: u32,
+    height: u32,
 ) -> Result<String, String> {
-    crate::render::start_export(&video_path, &output_path, &state).map_err(|e| e.to_string())
+    crate::render::start_export(&video_path, &output_path, width, height, &state)
+        .map_err(|e| e.to_string())
 }
 
 /// Write one PNG-encoded overlay frame to FFmpeg stdin.

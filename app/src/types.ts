@@ -4,6 +4,8 @@ export interface VideoMetadataDto {
   durationMs: number;
   frameRate: number;
   hasTimestamp: boolean;
+  width: number;
+  height: number;
 }
 
 export interface TelemetryFrameDto {

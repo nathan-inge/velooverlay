@@ -125,11 +125,20 @@ function buildVideoRoute(frames: TelemetryFrameDto[]): RouteData {
   };
 }
 
+// The GUI stage is always 1920×1080 logical pixels. Widget positions and sizes
+// are expressed in that coordinate space. When exporting at a different resolution
+// we scale everything proportionally so widgets stay in the same relative position.
+const STAGE_W = 1920;
+const STAGE_H = 1080;
+
 // ── Export loop ───────────────────────────────────────────────────────────────
 
 async function runExport(msg: StartMessage) {
   const { frames, route, layout, width, height } = msg;
   const total = frames.length;
+
+  const scaleX = width / STAGE_W;
+  const scaleY = height / STAGE_H;
 
   const sdkRoute = toRouteData(route);
   const sdkVideoRoute = buildVideoRoute(frames);
@@ -143,7 +152,8 @@ async function runExport(msg: StartMessage) {
   const compositeCanvas = new OffscreenCanvas(width, height);
   const compositeCtx = compositeCanvas.getContext('2d')!;
 
-  // Per-widget canvases — reused across frames, recreated on size change
+  // Per-widget canvases — reused across frames, recreated on size change.
+  // Canvases are sized in output pixels (scaled from stage coordinates).
   const widgetCanvases = new Map<string, OffscreenCanvas>();
 
   for (let i = 0; i < total; i++) {
@@ -156,18 +166,19 @@ async function runExport(msg: StartMessage) {
       const widget = WIDGET_REGISTRY[instance.type];
       if (!widget) continue;
 
-      // Get or create per-widget OffscreenCanvas
+      const ww = Math.round(instance.size.width * scaleX);
+      const wh = Math.round(instance.size.height * scaleY);
+      const wx = Math.round(instance.position.x * scaleX);
+      const wy = Math.round(instance.position.y * scaleY);
+
+      // Get or create per-widget OffscreenCanvas (output-resolution sized)
       let wCanvas = widgetCanvases.get(instance.id);
-      if (
-        !wCanvas ||
-        wCanvas.width !== instance.size.width ||
-        wCanvas.height !== instance.size.height
-      ) {
-        wCanvas = new OffscreenCanvas(instance.size.width, instance.size.height);
+      if (!wCanvas || wCanvas.width !== ww || wCanvas.height !== wh) {
+        wCanvas = new OffscreenCanvas(ww, wh);
         widgetCanvases.set(instance.id, wCanvas);
       }
 
-      wCanvas.getContext('2d')!.clearRect(0, 0, instance.size.width, instance.size.height);
+      wCanvas.getContext('2d')!.clearRect(0, 0, ww, wh);
 
       const renderCtx: WidgetRenderContext = {
         frame: sdkFrame,
@@ -178,8 +189,8 @@ async function runExport(msg: StartMessage) {
         // resolution issues, so we assert here.
         canvas: wCanvas as unknown as HTMLCanvasElement,
         theme: sdkTheme,
-        width: instance.size.width,
-        height: instance.size.height,
+        width: ww,
+        height: wh,
       };
 
       try {
@@ -188,7 +199,7 @@ async function runExport(msg: StartMessage) {
         console.error(`Widget render error [${instance.type}]:`, err);
       }
 
-      compositeCtx.drawImage(wCanvas, instance.position.x, instance.position.y);
+      compositeCtx.drawImage(wCanvas, wx, wy);
     }
 
     // Encode frame as PNG — the mostly-transparent overlay compresses from

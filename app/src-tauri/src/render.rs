@@ -42,22 +42,30 @@ fn make_session_id() -> String {
 
 // ── Public API ────────────────────────────────────────────────────────────────
 
-/// Probe the video, spawn FFmpeg reading RGBA from stdin, and register a session.
+/// Probe the video, spawn FFmpeg reading PNG frames from stdin, and register a session.
 ///
 /// Returns the session ID that callers must pass to subsequent commands.
-/// Always renders at 1920×1080 (Phase 1 fixed output).
 pub fn start_export(
     video_path: &str,
     output_path: &str,
+    width: u32,
+    height: u32,
     state: &ExportState,
 ) -> Result<String> {
     let video_meta = crate::video_meta::probe(std::path::Path::new(video_path))
         .context("Failed to probe video")?;
 
-    // Spawn FFmpeg with the same filter_complex as the old blocking export:
-    //   • Scale source to 1920×1080 with cover-crop (matches GUI stage CSS object-fit: cover)
-    //   • Overlay the PNG stdin stream at (0, 0) via image2pipe
-    //
+    // Build the scale+crop filter string for the requested output resolution.
+    // The source video is scaled with cover-crop to exactly width×height,
+    // matching the GUI stage's CSS object-fit: cover behaviour.
+    let filter = format!(
+        "[0:v]scale={w}:{h}:force_original_aspect_ratio=increase,\
+         crop={w}:{h}:(iw-{w})/2:(ih-{h})/2[base];\
+         [base][1:v]overlay=0:0",
+        w = width,
+        h = height
+    );
+
     // PNG encoding on the JS side compresses the mostly-transparent overlay from
     // ~8 MB raw RGBA to ~50–200 KB per frame, cutting IPC cost by ~100×.
     // PNG is self-delimiting (IEND chunk), so FFmpeg knows frame boundaries.
@@ -75,9 +83,7 @@ pub fn start_export(
             "-i",
             "pipe:0",
             "-filter_complex",
-            "[0:v]scale=1920:1080:force_original_aspect_ratio=increase,\
-             crop=1920:1080:(iw-1920)/2:(ih-1080)/2[base];\
-             [base][1:v]overlay=0:0",
+            &filter,
             "-c:v",
             "libx264",
             "-crf",

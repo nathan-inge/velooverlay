@@ -25,6 +25,18 @@ const VIDEO_FILTERS = [{ name: 'Video', extensions: ['mp4', 'mov'] }];
 const TELEMETRY_FILTERS = [{ name: 'Telemetry', extensions: ['fit', 'gpx', 'tcx'] }];
 const VIDEO_OUTPUT_FILTERS = [{ name: 'Video', extensions: ['mp4'] }];
 
+export type ExportResolution = 'source' | '1080p' | '1440p' | '4k';
+
+function resolveOutputSize(
+  resolution: ExportResolution,
+  meta: import('../types').VideoMetadataDto | null,
+): { width: number; height: number } {
+  if (resolution === 'source' && meta) return { width: meta.width, height: meta.height };
+  if (resolution === '4k')    return { width: 3840, height: 2160 };
+  if (resolution === '1440p') return { width: 2560, height: 1440 };
+  return { width: 1920, height: 1080 };
+}
+
 function generateId(): string {
   return `w-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 7)}`;
 }
@@ -51,11 +63,13 @@ interface AppState {
   isExporting: boolean;
   exportError: string | null;
   exportProgress: { done: number; total: number } | null;
+  exportResolution: ExportResolution;
   isSyncing: boolean;
   syncMessage: string | null;
 
   // Actions
   init: () => Promise<void>;
+  setExportResolution: (r: ExportResolution) => void;
   // File import — dialog
   importVideo: () => Promise<void>;
   importTelemetry: () => Promise<void>;
@@ -96,6 +110,7 @@ export const useStore = create<AppState>((set, get) => ({
   isExporting: false,
   exportError: null,
   exportProgress: null,
+  exportResolution: 'source' as ExportResolution,
   isSyncing: false,
   syncMessage: null,
 
@@ -241,9 +256,12 @@ export const useStore = create<AppState>((set, get) => ({
     set({ layout: { ...layout, theme: { ...layout.theme, ...patch } } });
   },
 
+  setExportResolution: (r) => set({ exportResolution: r }),
+
   // ── Export ──────────────────────────────────────────────────────
   exportVideo: async () => {
-    const { videoPath, frames, route, layout } = get();
+    const { videoPath, frames, route, layout, exportResolution, videoMetadata } = get();
+    const { width, height } = resolveOutputSize(exportResolution, videoMetadata);
     if (!videoPath || frames.length === 0) return;
 
     const outputPath = await save({ filters: VIDEO_OUTPUT_FILTERS, defaultPath: 'output.mp4' });
@@ -257,7 +275,7 @@ export const useStore = create<AppState>((set, get) => ({
 
     let sessionId: string;
     try {
-      sessionId = await invoke<string>('start_export_session', { videoPath, outputPath });
+      sessionId = await invoke<string>('start_export_session', { videoPath, outputPath, width, height });
     } catch (e) {
       set({ exportError: String(e) });
       return;
@@ -333,8 +351,8 @@ export const useStore = create<AppState>((set, get) => ({
           theme: layout.theme,
           widgets: layout.widgets,
         },
-        width: 1920,
-        height: 1080,
+        width,
+        height,
       };
       worker.postMessage(startMsg);
     });
