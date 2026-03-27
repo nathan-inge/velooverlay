@@ -19,6 +19,7 @@ pub struct VideoMetadataDto {
     pub has_timestamp: bool,
     pub width: u32,
     pub height: u32,
+    pub bit_rate_bps: Option<u64>,
 }
 
 #[derive(Serialize)]
@@ -96,6 +97,7 @@ pub fn get_video_metadata(video_path: String) -> Result<VideoMetadataDto, String
         has_timestamp: meta.recorded_start_time.is_some(),
         width: dims.width,
         height: dims.height,
+        bit_rate_bps: dims.bit_rate_bps,
     })
 }
 
@@ -242,9 +244,21 @@ pub fn start_export_session(
     width: u32,
     height: u32,
     encoder: String,
+    crop_vertical: bool,
+    trim_start: Option<f64>,
+    trim_end: Option<f64>,
+    vertical_zoom: f64,
+    vertical_offset_x: f64,
+    vertical_offset_y: f64,
+    export_bitrate: String,
 ) -> Result<String, String> {
-    crate::render::start_export(&video_path, &output_path, width, height, &encoder, &state)
-        .map_err(|e| e.to_string())
+    crate::render::start_export(
+        &video_path, &output_path, width, height, &encoder,
+        crop_vertical, trim_start, trim_end,
+        vertical_zoom, vertical_offset_x, vertical_offset_y,
+        &export_bitrate,
+        &state,
+    ).map_err(|e| e.to_string())
 }
 
 /// Write one PNG-encoded overlay frame to FFmpeg stdin.

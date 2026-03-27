@@ -56,9 +56,16 @@ pub fn start_export(
     width: u32,
     height: u32,
     encoder: &str,
+    crop_vertical: bool,
+    trim_start: Option<f64>,
+    trim_end: Option<f64>,
+    vertical_zoom: f64,
+    vertical_offset_x: f64,
+    vertical_offset_y: f64,
+    export_bitrate: &str,
     state: &ExportState,
 ) -> Result<String> {
-    let video_meta = crate::video_meta::probe(std::path::Path::new(video_path))
+    let (video_meta, src_dims) = crate::video_meta::probe_with_dimensions(std::path::Path::new(video_path))
         .context("Failed to probe video")?;
 
     // Build the filter_complex for scale/crop/overlay at the requested resolution.
@@ -67,32 +74,85 @@ pub fn start_export(
     // output resolution — encoding a 4K OffscreenCanvas to PNG takes ~50ms/frame in
     // WebKit vs ~10ms at 1080p. We upscale the overlay here with bicubic interpolation
     // before compositing. Widget graphics (text, shapes) upscale cleanly to 4K.
-    let filter = format!(
-        "[0:v]scale={w}:{h}:force_original_aspect_ratio=increase,\
-         crop={w}:{h}:(iw-{w})/2:(ih-{h})/2[base];\
-         [1:v]scale={w}:{h}:flags=bicubic[ovl];\
-         [base][ovl]overlay=0:0",
-        w = width,
-        h = height
-    );
+    //
+    // When seeking with -ss, setpts=PTS-STARTPTS resets the video timestamps to 0 so
+    // that the overlay pipe (which always starts at pts=0) stays in sync.
+    let filter = if crop_vertical {
+        let setpts = if trim_start.map_or(false, |s| s > 0.0) { "setpts=PTS-STARTPTS," } else { "" };
+
+        let src_w = src_dims.width as f64;
+        let src_h = src_dims.height as f64;
+
+        // Scale to fill output height × user zoom
+        let total_scale = (height as f64 / src_h) * vertical_zoom;
+
+        // Round dimensions to even numbers (required by most codecs)
+        let scaled_w = ((src_w * total_scale).round() as i64 / 2 * 2).max(2);
+        let scaled_h = ((src_h * total_scale).round() as i64 / 2 * 2).max(2);
+
+        // Convert source-pixel offsets → scaled-space pixels
+        let pan_x = (vertical_offset_x * total_scale).round() as i64;
+        let pan_y = (vertical_offset_y * total_scale).round() as i64;
+
+        // Canvas large enough to keep crop coordinates non-negative for any pan
+        let canvas_w = scaled_w.max(width as i64 + 2 * pan_x.abs());
+        let canvas_h = scaled_h.max(height as i64 + 2 * pan_y.abs());
+        let pad_x = (canvas_w - scaled_w) / 2;
+        let pad_y = (canvas_h - scaled_h) / 2;
+        let crop_x = (canvas_w - width as i64) / 2 - pan_x;
+        let crop_y = (canvas_h - height as i64) / 2 - pan_y;
+
+        format!(
+            "[0:v]{setpts}scale={sw}:{sh},pad={cw}:{ch}:{px}:{py}:black,crop={ow}:{oh}:{cx}:{cy}[base];\
+             [1:v]scale=1920:1080:flags=bicubic,crop=607:1080:656:0,scale={ow}:{oh}:flags=bicubic[ovl];\
+             [base][ovl]overlay=0:0",
+            setpts = setpts,
+            sw = scaled_w, sh = scaled_h,
+            cw = canvas_w, ch = canvas_h,
+            px = pad_x, py = pad_y,
+            ow = width, oh = height,
+            cx = crop_x, cy = crop_y,
+        )
+    } else {
+        let setpts = if trim_start.map_or(false, |s| s > 0.0) { "setpts=PTS-STARTPTS," } else { "" };
+        format!(
+            "[0:v]{setpts}scale={w}:{h}:force_original_aspect_ratio=increase,\
+             crop={w}:{h}:(iw-{w})/2:(ih-{h})/2[base];\
+             [1:v]scale={w}:{h}:flags=bicubic[ovl];\
+             [base][ovl]overlay=0:0",
+            setpts = setpts, w = width, h = height
+        )
+    };
 
     let frame_rate_str = format!("{:.6}", video_meta.frame_rate);
 
-    // Compute a resolution-proportional bitrate for the hardware encoder.
-    // Target ~25 Mbps at 4K, scaling linearly with pixel count.
-    // (libx264 CRF 23 produces ~5–15 Mbps at 4K; the hardware encoder is
-    // less efficient at low bitrates so a higher absolute target is reasonable.)
-    let hw_bitrate = {
+    // Resolve the user's bitrate selection to an FFmpeg -b:v value, or None
+    // to fall back to CRF-based quality control for software encoders.
+    //
+    // "auto"  → None (CRF 23 for x264; resolution-proportional for hardware)
+    // "match" → source file bitrate read from ffprobe
+    // "NM"    → literal value passed directly to -b:v (e.g. "8M", "25M")
+    let user_bitrate: Option<String> = match export_bitrate {
+        "auto" => None,
+        "match" => src_dims.bit_rate_bps.map(|bps| format!("{}k", (bps / 1000).max(1))),
+        other  => Some(other.to_string()),
+    };
+
+    // Resolution-proportional fallback bitrate for the hardware encoder when
+    // no explicit bitrate is requested.  Target ~25 Mbps at 4K.
+    let hw_auto_bitrate = {
         let pixels = width as u64 * height as u64;
-        let mbps = (25 * pixels / (3840 * 2160)).max(4); // floor at 4 Mbps
+        let mbps = (25 * pixels / (3840 * 2160)).max(4);
         format!("{}M", mbps)
     };
 
-    // Build codec args based on encoder selection.
-    let codec_args: Vec<&str> = match encoder {
-        "fast"     => vec!["-c:v", "libx264", "-preset", "veryfast", "-crf", "23"],
-        "hardware" => vec!["-c:v", "h264_videotoolbox", "-b:v", &hw_bitrate],
-        _          => vec!["-c:v", "libx264", "-crf", "23"], // "balanced" / default
+    let codec_args: Vec<&str> = match (encoder, user_bitrate.as_deref()) {
+        ("fast", Some(br)) => vec!["-c:v", "libx264", "-preset", "veryfast", "-b:v", br],
+        ("fast", None)     => vec!["-c:v", "libx264", "-preset", "veryfast", "-crf", "23"],
+        ("hardware", Some(br)) => vec!["-c:v", "h264_videotoolbox", "-b:v", br],
+        ("hardware", None)     => vec!["-c:v", "h264_videotoolbox", "-b:v", &hw_auto_bitrate],
+        (_, Some(br)) => vec!["-c:v", "libx264", "-b:v", br],  // balanced + explicit
+        (_, None)     => vec!["-c:v", "libx264", "-crf", "23"], // balanced + auto
     };
 
     // For the hardware encoder, also use VideoToolbox to hardware-decode the
@@ -107,11 +167,25 @@ pub fn start_export(
         &[]
     };
 
+    // Owned strings for trim args (must outlive the &str args slice).
+    let trim_start_str = trim_start.map(|s| format!("{:.6}", s));
+    let duration_str = match (trim_start, trim_end) {
+        (Some(s), Some(e)) => Some(format!("{:.6}", e - s)),
+        (None,    Some(e)) => Some(format!("{:.6}", e)),
+        _                  => None,
+    };
+
     // PNG encoding on the JS side compresses the mostly-transparent overlay from
     // ~8 MB raw RGBA to ~50–200 KB per frame, cutting IPC cost by ~100×.
     // PNG is self-delimiting (IEND chunk), so FFmpeg knows frame boundaries.
     let mut args: Vec<&str> = vec!["-y"];
     args.extend_from_slice(hw_decode);
+    // Input seek must come before the video input for fast keyframe seek.
+    if let Some(ref s) = trim_start_str {
+        if trim_start.map_or(false, |v| v > 0.0) {
+            args.extend_from_slice(&["-ss", s]);
+        }
+    }
     args.extend_from_slice(&[
         "-i", video_path,
         "-f", "image2pipe", "-c:v", "png",
@@ -120,7 +194,11 @@ pub fn start_export(
         "-filter_complex", &filter,
     ]);
     args.extend_from_slice(&codec_args);
-    args.extend_from_slice(&["-c:a", "copy", output_path]);
+    args.extend_from_slice(&["-c:a", "copy"]);
+    if let Some(ref dur) = duration_str {
+        args.extend_from_slice(&["-t", dur]);
+    }
+    args.push(output_path);
 
     let mut child = std::process::Command::new("ffmpeg")
         .args(&args)

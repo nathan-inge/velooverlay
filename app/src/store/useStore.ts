@@ -27,11 +27,22 @@ const VIDEO_OUTPUT_FILTERS = [{ name: 'Video', extensions: ['mp4'] }];
 
 export type ExportResolution = 'source' | '1080p' | '1440p' | '4k';
 export type ExportEncoder   = 'balanced' | 'fast' | 'hardware';
+export type ExportBitrate   = 'auto' | 'match' | '4M' | '8M' | '16M' | '25M' | '50M';
 
 function resolveOutputSize(
   resolution: ExportResolution,
   meta: import('../types').VideoMetadataDto | null,
+  cropVertical: boolean,
 ): { width: number; height: number } {
+  if (cropVertical) {
+    if (resolution === 'source' && meta) {
+      const w = Math.floor(meta.height * 9 / 16);
+      return { width: w % 2 === 0 ? w : w - 1, height: meta.height };
+    }
+    if (resolution === '4k')    return { width: 2160, height: 3840 };
+    if (resolution === '1440p') return { width: 1440, height: 2560 };
+    return { width: 1080, height: 1920 };
+  }
   if (resolution === 'source' && meta) return { width: meta.width, height: meta.height };
   if (resolution === '4k')    return { width: 3840, height: 2160 };
   if (resolution === '1440p') return { width: 2560, height: 1440 };
@@ -66,6 +77,13 @@ interface AppState {
   exportProgress: { done: number; total: number } | null;
   exportResolution: ExportResolution;
   exportEncoder: ExportEncoder;
+  exportBitrate: ExportBitrate;
+  cropVertical: boolean;
+  trimStart: number | null;
+  trimEnd: number | null;
+  verticalZoom: number;
+  verticalOffsetX: number;
+  verticalOffsetY: number;
   isSyncing: boolean;
   syncMessage: string | null;
 
@@ -73,6 +91,13 @@ interface AppState {
   init: () => Promise<void>;
   setExportResolution: (r: ExportResolution) => void;
   setExportEncoder: (e: ExportEncoder) => void;
+  setExportBitrate: (b: ExportBitrate) => void;
+  setCropVertical: (v: boolean) => void;
+  setTrimStart: (s: number | null) => void;
+  setTrimEnd: (e: number | null) => void;
+  setVerticalZoom: (v: number) => void;
+  setVerticalOffsetX: (v: number) => void;
+  setVerticalOffsetY: (v: number) => void;
   // File import — dialog
   importVideo: () => Promise<void>;
   importTelemetry: () => Promise<void>;
@@ -115,6 +140,13 @@ export const useStore = create<AppState>((set, get) => ({
   exportProgress: null,
   exportResolution: 'source' as ExportResolution,
   exportEncoder: 'balanced' as ExportEncoder,
+  exportBitrate: 'auto' as ExportBitrate,
+  cropVertical: false,
+  trimStart: null,
+  trimEnd: null,
+  verticalZoom: 1.0,
+  verticalOffsetX: 0,
+  verticalOffsetY: 0,
   isSyncing: false,
   syncMessage: null,
 
@@ -200,13 +232,17 @@ export const useStore = create<AppState>((set, get) => ({
 
   // ── Layout ──────────────────────────────────────────────────────
   addWidget: (type, defaultSize, defaultConfig) => {
-    const { layout } = get();
+    const { layout, cropVertical } = get();
     const count = layout.widgets.length;
+    // In crop mode the visible strip starts at x=656 in 1920×1080 space;
+    // offset the default spawn position so widgets appear in the visible area.
+    const CROP_OFFSET_X = Math.floor((1920 - Math.floor(1080 * 9 / 16)) / 2); // 656
+    const baseX = cropVertical ? CROP_OFFSET_X + 20 : 20;
     const newWidget: WidgetInstance = {
       id: generateId(),
       type,
       version: '1.0.0',
-      position: { x: 20 + count * 12, y: 20 + count * 12 },
+      position: { x: baseX + count * 12, y: 20 + count * 12 },
       size: defaultSize,
       config: defaultConfig,
     };
@@ -262,15 +298,27 @@ export const useStore = create<AppState>((set, get) => ({
 
   setExportResolution: (r) => set({ exportResolution: r }),
   setExportEncoder: (e) => set({ exportEncoder: e }),
+  setExportBitrate: (b) => set({ exportBitrate: b }),
+  setCropVertical: (v) => set({ cropVertical: v }),
+  setTrimStart: (s) => set({ trimStart: s }),
+  setTrimEnd: (e) => set({ trimEnd: e }),
+  setVerticalZoom: (v) => set({ verticalZoom: v }),
+  setVerticalOffsetX: (v) => set({ verticalOffsetX: v }),
+  setVerticalOffsetY: (v) => set({ verticalOffsetY: v }),
 
   // ── Export ──────────────────────────────────────────────────────
   exportVideo: async () => {
-    const { videoPath, frames, route, layout, exportResolution, exportEncoder, videoMetadata } = get();
-    const { width, height } = resolveOutputSize(exportResolution, videoMetadata);
+    const { videoPath, frames, route, layout, exportResolution, exportEncoder, exportBitrate, videoMetadata, cropVertical, trimStart, trimEnd, verticalZoom, verticalOffsetX, verticalOffsetY } = get();
+    const { width, height } = resolveOutputSize(exportResolution, videoMetadata, cropVertical);
     if (!videoPath || frames.length === 0) return;
 
     const outputPath = await save({ filters: VIDEO_OUTPUT_FILTERS, defaultPath: 'output.mp4' });
     if (!outputPath) return;
+
+    const fps = videoMetadata?.frameRate ?? 30;
+    const startIdx = trimStart != null ? Math.round(trimStart * fps) : 0;
+    const endIdx   = trimEnd   != null ? Math.round(trimEnd   * fps) : frames.length;
+    const exportFrames = frames.slice(startIdx, Math.min(endIdx, frames.length));
 
     // Check OffscreenCanvas availability (requires macOS 13+ / WebKit 16.4+)
     if (typeof OffscreenCanvas === 'undefined') {
@@ -280,14 +328,23 @@ export const useStore = create<AppState>((set, get) => ({
 
     let sessionId: string;
     try {
-      sessionId = await invoke<string>('start_export_session', { videoPath, outputPath, width, height, encoder: exportEncoder });
+      sessionId = await invoke<string>('start_export_session', {
+        videoPath, outputPath, width, height, encoder: exportEncoder,
+        cropVertical,
+        trimStart: trimStart ?? null,
+        trimEnd: trimEnd ?? null,
+        verticalZoom,
+        verticalOffsetX,
+        verticalOffsetY,
+        exportBitrate,
+      });
     } catch (e) {
       set({ exportError: String(e) });
       return;
     }
 
     activeExportSessionId = sessionId;
-    const total = frames.length;
+    const total = exportFrames.length;
     set({ isExporting: true, exportError: null, exportProgress: { done: 0, total } });
 
     const worker = new Worker(new URL('../export/ExportWorker.ts', import.meta.url), {
@@ -350,7 +407,7 @@ export const useStore = create<AppState>((set, get) => ({
 
       const startMsg: StartMessage = {
         type: 'start',
-        frames,
+        frames: exportFrames,
         route: route ?? { points: [], bounds: { minLat: 0, maxLat: 0, minLon: 0, maxLon: 0 } },
         layout: {
           theme: layout.theme,

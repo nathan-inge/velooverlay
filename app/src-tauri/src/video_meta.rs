@@ -24,6 +24,7 @@ struct FfprobeStream {
 #[derive(Deserialize)]
 struct FfprobeFormat {
     duration: Option<String>,
+    bit_rate: Option<String>,
     tags: Option<HashMap<String, String>>,
 }
 
@@ -31,6 +32,8 @@ struct FfprobeFormat {
 pub struct VideoDimensions {
     pub width: u32,
     pub height: u32,
+    /// Overall file bitrate in bits per second (from ffprobe `format.bit_rate`).
+    pub bit_rate_bps: Option<u64>,
 }
 
 /// Run `ffprobe` on `path` and return `(VideoMetadata, VideoDimensions)`.
@@ -96,10 +99,16 @@ fn probe_internal(path: &Path) -> Result<(VideoMetadata, VideoDimensions)> {
         })
         .unwrap_or(30.0);
 
+    let bit_rate_bps: Option<u64> = probe
+        .format
+        .bit_rate
+        .as_deref()
+        .and_then(|s| s.parse().ok());
+
     let dims = video_stream
         .and_then(|s| s.width.zip(s.height))
-        .map(|(w, h)| VideoDimensions { width: w, height: h })
-        .unwrap_or(VideoDimensions { width: 1920, height: 1080 });
+        .map(|(w, h)| VideoDimensions { width: w, height: h, bit_rate_bps })
+        .unwrap_or(VideoDimensions { width: 1920, height: 1080, bit_rate_bps });
 
     // Priority:
     // 1. `com.apple.quicktime.creationdate` — preserved by iMovie/Apple apps

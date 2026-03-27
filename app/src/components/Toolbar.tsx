@@ -1,7 +1,26 @@
 import { useRef, useEffect } from 'react';
 import { useStore } from '../store/useStore';
-import type { ExportResolution, ExportEncoder } from '../store/useStore';
+import type { ExportResolution, ExportEncoder, ExportBitrate } from '../store/useStore';
 import logo from '../assets/logo.png';
+
+function parseTime(str: string): number | null {
+  const trimmed = str.trim();
+  if (!trimmed) return null;
+  // Plain number
+  if (/^\d+(\.\d+)?$/.test(trimmed)) return parseFloat(trimmed);
+  // H:MM:SS or M:SS
+  const parts = trimmed.split(':').map(Number);
+  if (parts.some(isNaN)) return null;
+  if (parts.length === 2) return parts[0] * 60 + parts[1];
+  if (parts.length === 3) return parts[0] * 3600 + parts[1] * 60 + parts[2];
+  return null;
+}
+
+function formatTime(s: number): string {
+  const m = Math.floor(s / 60);
+  const sec = Math.floor(s % 60);
+  return `${m}:${sec.toString().padStart(2, '0')}`;
+}
 
 function formatEta(ms: number): string {
   const s = Math.ceil(ms / 1000);
@@ -24,6 +43,16 @@ const ENCODER_OPTIONS: { value: ExportEncoder; label: string }[] = [
   { value: 'hardware', label: 'Hardware' },
 ];
 
+const BITRATE_OPTIONS: { value: ExportBitrate; label: string }[] = [
+  { value: 'auto',  label: 'Auto'        },
+  { value: 'match', label: 'Match source' },
+  { value: '4M',    label: '4 Mbps'      },
+  { value: '8M',    label: '8 Mbps'      },
+  { value: '16M',   label: '16 Mbps'     },
+  { value: '25M',   label: '25 Mbps'     },
+  { value: '50M',   label: '50 Mbps'     },
+];
+
 export default function Toolbar() {
   const {
     videoPath,
@@ -34,6 +63,7 @@ export default function Toolbar() {
     exportProgress,
     exportResolution,
     frames,
+    videoMetadata,
     importVideo,
     importTelemetry,
     exportVideo,
@@ -41,6 +71,14 @@ export default function Toolbar() {
     setExportResolution,
     exportEncoder,
     setExportEncoder,
+    exportBitrate,
+    setExportBitrate,
+    cropVertical,
+    trimStart,
+    trimEnd,
+    setCropVertical,
+    setTrimStart,
+    setTrimEnd,
   } = useStore();
 
   const canExport = !!videoPath && !!telemetryPath && frames.length > 0 && !isExporting;
@@ -138,6 +176,58 @@ export default function Toolbar() {
           <option key={o.value} value={o.value}>{o.label}</option>
         ))}
       </select>
+
+      <select
+        className="btn"
+        value={exportBitrate}
+        onChange={(e) => setExportBitrate(e.target.value as ExportBitrate)}
+        disabled={isExporting}
+        style={{ fontSize: 12, padding: '3px 6px' }}
+      >
+        {BITRATE_OPTIONS.map((o) => {
+          const label = o.value === 'match' && videoMetadata?.bitRateBps
+            ? `Match source (${Math.round(videoMetadata.bitRateBps / 1_000_000)} Mbps)`
+            : o.label;
+          return <option key={o.value} value={o.value}>{label}</option>;
+        })}
+      </select>
+
+      <div className="toolbar-sep" />
+
+      <label style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 12, color: '#ccc', cursor: isExporting ? 'not-allowed' : 'pointer' }}>
+        <input
+          type="checkbox"
+          checked={cropVertical}
+          onChange={(e) => setCropVertical(e.target.checked)}
+          disabled={isExporting}
+        />
+        9:16
+      </label>
+
+      <span style={{ fontSize: 12, color: '#888' }}>Trim:</span>
+      <input
+        type="text"
+        className="btn"
+        placeholder="0:00"
+        defaultValue={trimStart != null ? formatTime(trimStart) : ''}
+        key={`ts-${trimStart}`}
+        onBlur={(e) => setTrimStart(parseTime(e.target.value))}
+        disabled={isExporting}
+        style={{ width: 48, fontSize: 12, padding: '3px 6px', textAlign: 'center' }}
+      />
+      <span style={{ fontSize: 11, color: '#666' }}>→</span>
+      <input
+        type="text"
+        className="btn"
+        placeholder={videoMetadata ? formatTime(videoMetadata.durationMs / 1000) : 'end'}
+        defaultValue={trimEnd != null ? formatTime(trimEnd) : ''}
+        key={`te-${trimEnd}`}
+        onBlur={(e) => setTrimEnd(parseTime(e.target.value))}
+        disabled={isExporting}
+        style={{ width: 48, fontSize: 12, padding: '3px 6px', textAlign: 'center' }}
+      />
+
+      <div className="toolbar-sep" />
 
       {isExporting ? (
         <button className="btn" onClick={cancelExport}>

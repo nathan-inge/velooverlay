@@ -6,6 +6,7 @@ import Toolbar from './components/Toolbar';
 import WidgetPanel from './components/WidgetPanel';
 import Stage from './components/Stage/index';
 import WidgetInspector from './components/WidgetInspector';
+import FramingEditor from './components/FramingEditor';
 
 const FONT_OPTIONS = [
   { label: 'Helvetica', value: 'Helvetica, sans-serif' },
@@ -20,6 +21,7 @@ export default function App() {
   const layout = useStore((s) => s.layout);
   const selectedWidgetId = useStore((s) => s.selectedWidgetId);
   const updateTheme = useStore((s) => s.updateTheme);
+  const cropVertical = useStore((s) => s.cropVertical);
   const { isDragOver } = useDragDrop();
 
   const selectedWidget = layout.widgets.find((w) => w.id === selectedWidgetId) ?? null;
@@ -36,6 +38,14 @@ export default function App() {
         <WidgetPanel />
         <Stage />
         <div className="inspector-panel">
+          {/* Framing — shown when 9:16 crop is enabled */}
+          {cropVertical && (
+            <div className="sidebar-section">
+              <div className="sidebar-section-title">Framing</div>
+              <FramingEditor />
+            </div>
+          )}
+
           {/* Theme — always visible at top */}
           <div className="sidebar-section">
             <div className="sidebar-section-title">Theme</div>

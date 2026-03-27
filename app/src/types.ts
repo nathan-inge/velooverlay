@@ -6,6 +6,7 @@ export interface VideoMetadataDto {
   hasTimestamp: boolean;
   width: number;
   height: number;
+  bitRateBps: number | null;
 }
 
 export interface TelemetryFrameDto {
