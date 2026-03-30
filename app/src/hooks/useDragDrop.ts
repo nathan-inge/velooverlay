@@ -1,17 +1,13 @@
 import { useEffect, useState } from 'react';
-import { listen } from '@tauri-apps/api/event';
+import { getCurrentWindow } from '@tauri-apps/api/window';
 import { useStore } from '../store/useStore';
 
 const VIDEO_EXTS = new Set(['mp4', 'mov']);
 const TELEMETRY_EXTS = new Set(['fit', 'gpx', 'tcx']);
 const LAYOUT_EXTS = new Set(['json']);
 
-interface FileDropPayload {
-  paths: string[];
-}
-
 /**
- * Listens for Tauri file-drop events on the entire window.
+ * Listens for Tauri drag-drop events on the entire window.
  * Routes dropped files to the store based on their extension.
  * Returns `isDragOver` so the caller can show a visual indicator.
  */
@@ -22,37 +18,35 @@ export function useDragDrop(): { isDragOver: boolean } {
   const loadLayoutFromPath = useStore((s) => s.loadLayoutFromPath);
 
   useEffect(() => {
-    // Tauri v2 file-drop events.
-    // Each `listen` call returns a Promise<UnlistenFn>; we collect them and
-    // call them all in the cleanup function.
-    const unsubscribes: Array<() => void> = [];
+    let unlisten: (() => void) | undefined;
 
     const setup = async () => {
-      const unDrop = await listen<FileDropPayload>('tauri://file-drop', async (event) => {
-        setIsDragOver(false);
-        const { paths } = event.payload;
-        for (const path of paths) {
-          const ext = path.split('.').pop()?.toLowerCase() ?? '';
-          if (VIDEO_EXTS.has(ext)) {
-            await setVideoFromPath(path);
-          } else if (TELEMETRY_EXTS.has(ext)) {
-            await setTelemetryFromPath(path);
-          } else if (LAYOUT_EXTS.has(ext)) {
-            await loadLayoutFromPath(path);
+      unlisten = await getCurrentWindow().onDragDropEvent(async (event) => {
+        const { type } = event.payload;
+        if (type === 'enter' || type === 'over') {
+          setIsDragOver(true);
+        } else if (type === 'leave') {
+          setIsDragOver(false);
+        } else if (type === 'drop') {
+          setIsDragOver(false);
+          for (const path of event.payload.paths) {
+            const ext = path.split('.').pop()?.toLowerCase() ?? '';
+            if (VIDEO_EXTS.has(ext)) {
+              await setVideoFromPath(path);
+            } else if (TELEMETRY_EXTS.has(ext)) {
+              await setTelemetryFromPath(path);
+            } else if (LAYOUT_EXTS.has(ext)) {
+              await loadLayoutFromPath(path);
+            }
           }
         }
       });
-
-      const unHover = await listen('tauri://file-drop-hover', () => setIsDragOver(true));
-      const unCancel = await listen('tauri://file-drop-cancelled', () => setIsDragOver(false));
-
-      unsubscribes.push(unDrop, unHover, unCancel);
     };
 
     void setup();
 
     return () => {
-      unsubscribes.forEach((fn) => fn());
+      unlisten?.();
     };
   }, [setVideoFromPath, setTelemetryFromPath, loadLayoutFromPath]);
 
