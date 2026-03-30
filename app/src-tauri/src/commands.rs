@@ -244,18 +244,18 @@ pub fn start_export_session(
     width: u32,
     height: u32,
     encoder: String,
-    crop_vertical: bool,
+    crop_aspect: String, // "9:16", "1:1", "4:3", "3:4", or "" for no crop
     trim_start: Option<f64>,
     trim_end: Option<f64>,
-    vertical_zoom: f64,
-    vertical_offset_x: f64,
-    vertical_offset_y: f64,
+    crop_zoom: f64,
+    crop_offset_x: f64,
+    crop_offset_y: f64,
     export_bitrate: String,
 ) -> Result<String, String> {
     crate::render::start_export(
         &video_path, &output_path, width, height, &encoder,
-        crop_vertical, trim_start, trim_end,
-        vertical_zoom, vertical_offset_x, vertical_offset_y,
+        &crop_aspect, trim_start, trim_end,
+        crop_zoom, crop_offset_x, crop_offset_y,
         &export_bitrate,
         &state,
     ).map_err(|e| e.to_string())

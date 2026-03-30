@@ -56,17 +56,32 @@ pub fn start_export(
     width: u32,
     height: u32,
     encoder: &str,
-    crop_vertical: bool,
+    crop_aspect: &str, // "9:16", "1:1", "4:3", "3:4", or "" for no crop
     trim_start: Option<f64>,
     trim_end: Option<f64>,
-    vertical_zoom: f64,
-    vertical_offset_x: f64,
-    vertical_offset_y: f64,
+    crop_zoom: f64,
+    crop_offset_x: f64,
+    crop_offset_y: f64,
     export_bitrate: &str,
     state: &ExportState,
 ) -> Result<String> {
     let (video_meta, src_dims) = crate::video_meta::probe_with_dimensions(std::path::Path::new(video_path))
         .context("Failed to probe video")?;
+
+    // Parse the aspect ratio string into (ar_w, ar_h) integers.
+    // An empty string (or unrecognised value) means no crop.
+    let parsed_aspect: Option<(u32, u32)> = if crop_aspect.is_empty() {
+        None
+    } else {
+        let parts: Vec<&str> = crop_aspect.split(':').collect();
+        if parts.len() == 2 {
+            let aw = parts[0].parse::<u32>().ok();
+            let ah = parts[1].parse::<u32>().ok();
+            aw.zip(ah)
+        } else {
+            None
+        }
+    };
 
     // Build the filter_complex for scale/crop/overlay at the requested resolution.
     //
@@ -77,22 +92,22 @@ pub fn start_export(
     //
     // When seeking with -ss, setpts=PTS-STARTPTS resets the video timestamps to 0 so
     // that the overlay pipe (which always starts at pts=0) stays in sync.
-    let filter = if crop_vertical {
+    let filter = if let Some((ar_w, ar_h)) = parsed_aspect {
         let setpts = if trim_start.map_or(false, |s| s > 0.0) { "setpts=PTS-STARTPTS," } else { "" };
 
         let src_w = src_dims.width as f64;
         let src_h = src_dims.height as f64;
 
         // Scale to fill output height × user zoom
-        let total_scale = (height as f64 / src_h) * vertical_zoom;
+        let total_scale = (height as f64 / src_h) * crop_zoom;
 
         // Round dimensions to even numbers (required by most codecs)
         let scaled_w = ((src_w * total_scale).round() as i64 / 2 * 2).max(2);
         let scaled_h = ((src_h * total_scale).round() as i64 / 2 * 2).max(2);
 
         // Convert source-pixel offsets → scaled-space pixels
-        let pan_x = (vertical_offset_x * total_scale).round() as i64;
-        let pan_y = (vertical_offset_y * total_scale).round() as i64;
+        let pan_x = (crop_offset_x * total_scale).round() as i64;
+        let pan_y = (crop_offset_y * total_scale).round() as i64;
 
         // Canvas large enough to keep crop coordinates non-negative for any pan
         let canvas_w = scaled_w.max(width as i64 + 2 * pan_x.abs());
@@ -102,9 +117,16 @@ pub fn start_export(
         let crop_x = (canvas_w - width as i64) / 2 - pan_x;
         let crop_y = (canvas_h - height as i64) / 2 - pan_y;
 
+        // Overlay strip: the 1920×1080 PNG contains the full stage.
+        // We extract just the centred strip matching the crop aspect ratio.
+        const STAGE_W: u32 = 1920;
+        const STAGE_H: u32 = 1080;
+        let ovl_strip_w = (STAGE_H * ar_w / ar_h) & !1; // round down to even
+        let ovl_strip_x = (STAGE_W - ovl_strip_w) / 2;
+
         format!(
             "[0:v]{setpts}scale={sw}:{sh},pad={cw}:{ch}:{px}:{py}:black,crop={ow}:{oh}:{cx}:{cy}[base];\
-             [1:v]scale=1920:1080:flags=bicubic,crop=607:1080:656:0,scale={ow}:{oh}:flags=bicubic[ovl];\
+             [1:v]scale=1920:1080:flags=bicubic,crop={osw}:{osh}:{osx}:0,scale={ow}:{oh}:flags=bicubic[ovl];\
              [base][ovl]overlay=0:0",
             setpts = setpts,
             sw = scaled_w, sh = scaled_h,
@@ -112,6 +134,7 @@ pub fn start_export(
             px = pad_x, py = pad_y,
             ow = width, oh = height,
             cx = crop_x, cy = crop_y,
+            osw = ovl_strip_w, osh = STAGE_H, osx = ovl_strip_x,
         )
     } else {
         let setpts = if trim_start.map_or(false, |s| s > 0.0) { "setpts=PTS-STARTPTS," } else { "" };

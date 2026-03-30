@@ -11,6 +11,8 @@ import type {
 } from '../types';
 import type { StartMessage } from '../export/ExportWorker';
 import { WIDGET_REGISTRY } from '../export/widgetRegistry';
+import { type CropAspect, resolveOutputSize, cropStripOffsetX } from '../cropAspect';
+export type { CropAspect };
 
 const DEFAULT_LAYOUT: Layout = {
   schema_version: '1',
@@ -30,26 +32,6 @@ const LAYOUT_FILTERS = [{ name: 'Layout', extensions: ['json'] }];
 export type ExportResolution = 'source' | '1080p' | '1440p' | '4k';
 export type ExportEncoder   = 'balanced' | 'fast' | 'hardware';
 export type ExportBitrate   = 'auto' | 'match' | '4M' | '8M' | '16M' | '25M' | '50M';
-
-function resolveOutputSize(
-  resolution: ExportResolution,
-  meta: import('../types').VideoMetadataDto | null,
-  cropVertical: boolean,
-): { width: number; height: number } {
-  if (cropVertical) {
-    if (resolution === 'source' && meta) {
-      const w = Math.floor(meta.height * 9 / 16);
-      return { width: w % 2 === 0 ? w : w - 1, height: meta.height };
-    }
-    if (resolution === '4k')    return { width: 2160, height: 3840 };
-    if (resolution === '1440p') return { width: 1440, height: 2560 };
-    return { width: 1080, height: 1920 };
-  }
-  if (resolution === 'source' && meta) return { width: meta.width, height: meta.height };
-  if (resolution === '4k')    return { width: 3840, height: 2160 };
-  if (resolution === '1440p') return { width: 2560, height: 1440 };
-  return { width: 1920, height: 1080 };
-}
 
 function generateId(): string {
   return `w-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 7)}`;
@@ -80,12 +62,12 @@ interface AppState {
   exportResolution: ExportResolution;
   exportEncoder: ExportEncoder;
   exportBitrate: ExportBitrate;
-  cropVertical: boolean;
+  cropAspect: CropAspect;
   trimStart: number | null;
   trimEnd: number | null;
-  verticalZoom: number;
-  verticalOffsetX: number;
-  verticalOffsetY: number;
+  cropZoom: number;
+  cropOffsetX: number;
+  cropOffsetY: number;
   isSyncing: boolean;
   syncMessage: string | null;
   layoutMessage: string | null;
@@ -95,12 +77,12 @@ interface AppState {
   setExportResolution: (r: ExportResolution) => void;
   setExportEncoder: (e: ExportEncoder) => void;
   setExportBitrate: (b: ExportBitrate) => void;
-  setCropVertical: (v: boolean) => void;
+  setCropAspect: (v: CropAspect) => void;
   setTrimStart: (s: number | null) => void;
   setTrimEnd: (e: number | null) => void;
-  setVerticalZoom: (v: number) => void;
-  setVerticalOffsetX: (v: number) => void;
-  setVerticalOffsetY: (v: number) => void;
+  setCropZoom: (v: number) => void;
+  setCropOffsetX: (v: number) => void;
+  setCropOffsetY: (v: number) => void;
   // File import — dialog
   importVideo: () => Promise<void>;
   importTelemetry: () => Promise<void>;
@@ -209,12 +191,12 @@ export const useStore = create<AppState>((set, get) => ({
   exportResolution: 'source' as ExportResolution,
   exportEncoder: 'balanced' as ExportEncoder,
   exportBitrate: 'auto' as ExportBitrate,
-  cropVertical: false,
+  cropAspect: null,
   trimStart: null,
   trimEnd: null,
-  verticalZoom: 1.0,
-  verticalOffsetX: 0,
-  verticalOffsetY: 0,
+  cropZoom: 1.0,
+  cropOffsetX: 0,
+  cropOffsetY: 0,
   isSyncing: false,
   syncMessage: null,
   layoutMessage: null,
@@ -301,12 +283,11 @@ export const useStore = create<AppState>((set, get) => ({
 
   // ── Layout ──────────────────────────────────────────────────────
   addWidget: (type, defaultSize, defaultConfig) => {
-    const { layout, cropVertical } = get();
+    const { layout, cropAspect } = get();
     const count = layout.widgets.length;
-    // In crop mode the visible strip starts at x=656 in 1920×1080 space;
-    // offset the default spawn position so widgets appear in the visible area.
-    const CROP_OFFSET_X = Math.floor((1920 - Math.floor(1080 * 9 / 16)) / 2); // 656
-    const baseX = cropVertical ? CROP_OFFSET_X + 20 : 20;
+    // In crop mode the visible strip is offset from the left edge of 1920×1080 space;
+    // spawn widgets inside the visible strip.
+    const baseX = cropAspect ? cropStripOffsetX(cropAspect) + 20 : 20;
     const newWidget: WidgetInstance = {
       id: generateId(),
       type,
@@ -423,17 +404,18 @@ export const useStore = create<AppState>((set, get) => ({
   setExportResolution: (r) => set({ exportResolution: r }),
   setExportEncoder: (e) => set({ exportEncoder: e }),
   setExportBitrate: (b) => set({ exportBitrate: b }),
-  setCropVertical: (v) => set({ cropVertical: v }),
+  // Reset zoom/pan when switching aspect ratio so framing starts fresh.
+  setCropAspect: (v) => set({ cropAspect: v, cropZoom: 1.0, cropOffsetX: 0, cropOffsetY: 0 }),
   setTrimStart: (s) => set({ trimStart: s }),
   setTrimEnd: (e) => set({ trimEnd: e }),
-  setVerticalZoom: (v) => set({ verticalZoom: v }),
-  setVerticalOffsetX: (v) => set({ verticalOffsetX: v }),
-  setVerticalOffsetY: (v) => set({ verticalOffsetY: v }),
+  setCropZoom: (v) => set({ cropZoom: v }),
+  setCropOffsetX: (v) => set({ cropOffsetX: v }),
+  setCropOffsetY: (v) => set({ cropOffsetY: v }),
 
   // ── Export ──────────────────────────────────────────────────────
   exportVideo: async () => {
-    const { videoPath, frames, route, layout, exportResolution, exportEncoder, exportBitrate, videoMetadata, cropVertical, trimStart, trimEnd, verticalZoom, verticalOffsetX, verticalOffsetY } = get();
-    const { width, height } = resolveOutputSize(exportResolution, videoMetadata, cropVertical);
+    const { videoPath, frames, route, layout, exportResolution, exportEncoder, exportBitrate, videoMetadata, cropAspect, trimStart, trimEnd, cropZoom, cropOffsetX, cropOffsetY } = get();
+    const { width, height } = resolveOutputSize(exportResolution, videoMetadata, cropAspect);
     if (!videoPath || frames.length === 0) return;
 
     const outputPath = await save({ filters: VIDEO_OUTPUT_FILTERS, defaultPath: 'output.mp4' });
@@ -454,12 +436,12 @@ export const useStore = create<AppState>((set, get) => ({
     try {
       sessionId = await invoke<string>('start_export_session', {
         videoPath, outputPath, width, height, encoder: exportEncoder,
-        cropVertical,
+        cropAspect: cropAspect ?? '',
         trimStart: trimStart ?? null,
         trimEnd: trimEnd ?? null,
-        verticalZoom,
-        verticalOffsetX,
-        verticalOffsetY,
+        cropZoom,
+        cropOffsetX,
+        cropOffsetY,
         exportBitrate,
       });
     } catch (e) {

@@ -21,7 +21,7 @@ export default function App() {
   const layout = useStore((s) => s.layout);
   const selectedWidgetId = useStore((s) => s.selectedWidgetId);
   const updateTheme = useStore((s) => s.updateTheme);
-  const cropVertical = useStore((s) => s.cropVertical);
+  const cropAspect = useStore((s) => s.cropAspect);
   const { isDragOver } = useDragDrop();
 
   const selectedWidget = layout.widgets.find((w) => w.id === selectedWidgetId) ?? null;
@@ -38,8 +38,8 @@ export default function App() {
         <WidgetPanel />
         <Stage />
         <div className="inspector-panel">
-          {/* Framing — shown when 9:16 crop is enabled */}
-          {cropVertical && (
+          {/* Framing — shown when a crop aspect is active */}
+          {cropAspect && (
             <div className="sidebar-section">
               <div className="sidebar-section-title">Framing</div>
               <FramingEditor />

@@ -1,6 +1,6 @@
 import { useRef, useEffect, useCallback } from 'react';
 import { useStore } from '../store/useStore';
-import type { ExportResolution, ExportEncoder, ExportBitrate } from '../store/useStore';
+import type { ExportResolution, ExportEncoder, ExportBitrate, CropAspect } from '../store/useStore';
 import logo from '../assets/logo.png';
 
 function parseTime(str: string): number | null {
@@ -43,6 +43,15 @@ const ENCODER_OPTIONS: { value: ExportEncoder; label: string }[] = [
   { value: 'hardware', label: 'Hardware' },
 ];
 
+const CROP_OPTIONS: { value: CropAspect | 'none'; label: string }[] = [
+  { value: 'none',  label: 'Full' },
+  { value: '16:9',  label: '16:9' },
+  { value: '9:16',  label: '9:16' },
+  { value: '1:1',   label: '1:1'  },
+  { value: '4:3',   label: '4:3'  },
+  { value: '3:4',   label: '3:4'  },
+];
+
 const BITRATE_OPTIONS: { value: ExportBitrate; label: string }[] = [
   { value: 'auto',  label: 'Auto'        },
   { value: 'match', label: 'Match source' },
@@ -73,10 +82,10 @@ export default function Toolbar() {
     setExportEncoder,
     exportBitrate,
     setExportBitrate,
-    cropVertical,
+    cropAspect,
     trimStart,
     trimEnd,
-    setCropVertical,
+    setCropAspect,
     setTrimStart,
     setTrimEnd,
     saveLayout,
@@ -217,15 +226,20 @@ export default function Toolbar() {
 
       <div className="toolbar-sep" />
 
-      <label style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 12, color: '#ccc', cursor: isExporting ? 'not-allowed' : 'pointer' }}>
-        <input
-          type="checkbox"
-          checked={cropVertical}
-          onChange={(e) => setCropVertical(e.target.checked)}
-          disabled={isExporting}
-        />
-        9:16
-      </label>
+      <select
+        className="btn"
+        value={cropAspect ?? 'none'}
+        onChange={(e) => {
+          const v = e.target.value;
+          setCropAspect(v === 'none' ? null : v as CropAspect);
+        }}
+        disabled={isExporting}
+        style={{ fontSize: 12, padding: '3px 6px' }}
+      >
+        {CROP_OPTIONS.map((o) => (
+          <option key={String(o.value)} value={o.value ?? 'none'}>{o.label}</option>
+        ))}
+      </select>
 
       <span style={{ fontSize: 12, color: '#888' }}>Trim:</span>
       <input

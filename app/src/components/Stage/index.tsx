@@ -1,22 +1,20 @@
 import { useRef, useState, useEffect, useCallback } from 'react';
 import { convertFileSrc } from '@tauri-apps/api/core';
 import { useStore } from '../../store/useStore';
+import { cropStripWidth, cropStripOffsetX } from '../../cropAspect';
 import WidgetCanvas from './WidgetCanvas';
 import Timeline from '../Timeline';
 
 const STAGE_W = 1920;
 const STAGE_H = 1080;
-// Width of the 9:16 center strip in 1920×1080 widget space (matches render.rs overlay crop)
-const CROP_W = Math.floor(STAGE_H * 9 / 16); // 607
-const CROP_OFFSET_X = Math.floor((STAGE_W - CROP_W) / 2); // 656 — left edge of the strip
 
 export default function Stage() {
   const { videoPath, layout, selectedWidgetId, selectWidget, isProcessing, videoMetadata, exportError } =
     useStore();
-  const cropVertical    = useStore((s) => s.cropVertical);
-  const verticalZoom    = useStore((s) => s.verticalZoom);
-  const verticalOffsetX = useStore((s) => s.verticalOffsetX);
-  const verticalOffsetY = useStore((s) => s.verticalOffsetY);
+  const cropAspect   = useStore((s) => s.cropAspect);
+  const cropZoom     = useStore((s) => s.cropZoom);
+  const cropOffsetX  = useStore((s) => s.cropOffsetX);
+  const cropOffsetY  = useStore((s) => s.cropOffsetY);
 
   const videoRef = useRef<HTMLVideoElement>(null);
   const viewportRef = useRef<HTMLDivElement>(null);
@@ -24,9 +22,11 @@ export default function Stage() {
   const [videoTimeMs, setVideoTimeMs] = useState(0);
   const [isPlaying, setIsPlaying] = useState(false);
 
-  // When crop mode is active the stage shrinks to the 9:16 strip so that the
-  // viewport scale recalculates to fill available space with the portrait view.
-  const stageW = cropVertical ? CROP_W : STAGE_W;
+  // When crop mode is active the stage shrinks to the crop strip width so the
+  // viewport scale recalculates to fill available space with the cropped view.
+  const cropW       = cropStripWidth(cropAspect);
+  const cropOffX    = cropStripOffsetX(cropAspect);
+  const stageW      = cropAspect ? cropW : STAGE_W;
 
   // ── Scale stage to fit the available viewport ─────────────────
   useEffect(() => {
@@ -41,7 +41,7 @@ export default function Stage() {
     const ro = new ResizeObserver(measure);
     ro.observe(viewportRef.current);
     return () => ro.disconnect();
-  }, [stageW]); // re-run whenever crop mode changes
+  }, [stageW]); // re-run whenever crop changes
 
   // ── Video time + play state ────────────────────────────────────
   const handleTimeUpdate = useCallback(() => {
@@ -77,22 +77,22 @@ export default function Stage() {
 
   // ── Crop-mode video positioning ───────────────────────────────
   // Replicate the FFmpeg scale→crop framing in CSS so the preview exactly
-  // matches the export output.  The container in crop mode is CROP_W × STAGE_H.
+  // matches the export output.  The container in crop mode is cropW × STAGE_H.
   const srcW = videoMetadata?.width  ?? 1920;
   const srcH = videoMetadata?.height ?? 1080;
 
   let cropVideoStyle: React.CSSProperties = {};
-  if (cropVertical) {
-    const displayScale = verticalZoom * STAGE_H / srcH;
+  if (cropAspect) {
+    const displayScale = cropZoom * STAGE_H / srcH;
     const videoW = srcW * displayScale;
-    const videoH = STAGE_H * verticalZoom;
+    const videoH = STAGE_H * cropZoom;
     cropVideoStyle = {
       position: 'absolute',
       width:     videoW,
       height:    videoH,
-      // Center within the CROP_W-wide container + pan offset
-      left: CROP_W / 2 - videoW / 2 + verticalOffsetX * displayScale,
-      top:  (STAGE_H - videoH) / 2   + verticalOffsetY * displayScale,
+      // Center within the crop-wide container + pan offset
+      left: cropW / 2 - videoW / 2 + cropOffsetX * displayScale,
+      top:  (STAGE_H - videoH) / 2  + cropOffsetY * displayScale,
       objectFit: 'fill',
     };
   }
@@ -148,16 +148,15 @@ export default function Stage() {
 
               {/*
                * Widget overlay.
-               * In crop mode the overlay is shifted left by CROP_OFFSET_X so
-               * that widget positions stored in 1920×1080 space appear at the
-               * correct location within the 9:16 strip.  Widgets outside the
-               * strip are clipped by the container's overflow:hidden.
+               * In crop mode the overlay is shifted left by cropOffX so that
+               * widget positions stored in 1920×1080 space appear at the correct
+               * location within the crop strip.  Widgets outside are clipped.
                */}
               <div
                 className="stage-overlay"
-                style={cropVertical ? {
+                style={cropAspect ? {
                   position: 'absolute',
-                  left:   -CROP_OFFSET_X,
+                  left:   -cropOffX,
                   top:    0,
                   right:  'auto',
                   bottom: 'auto',
