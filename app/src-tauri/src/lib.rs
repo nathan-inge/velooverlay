@@ -16,6 +16,8 @@ pub fn run() {
             commands::write_frame,
             commands::finish_export,
             commands::abort_export,
+            commands::save_layout_file,
+            commands::read_layout_file,
         ])
         .run(tauri::generate_context!())
         .expect("error while running VeloOverlay");

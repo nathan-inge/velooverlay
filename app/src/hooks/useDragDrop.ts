@@ -4,6 +4,7 @@ import { useStore } from '../store/useStore';
 
 const VIDEO_EXTS = new Set(['mp4', 'mov']);
 const TELEMETRY_EXTS = new Set(['fit', 'gpx', 'tcx']);
+const LAYOUT_EXTS = new Set(['json']);
 
 interface FileDropPayload {
   paths: string[];
@@ -18,6 +19,7 @@ export function useDragDrop(): { isDragOver: boolean } {
   const [isDragOver, setIsDragOver] = useState(false);
   const setVideoFromPath = useStore((s) => s.setVideoFromPath);
   const setTelemetryFromPath = useStore((s) => s.setTelemetryFromPath);
+  const loadLayoutFromPath = useStore((s) => s.loadLayoutFromPath);
 
   useEffect(() => {
     // Tauri v2 file-drop events.
@@ -35,6 +37,8 @@ export function useDragDrop(): { isDragOver: boolean } {
             await setVideoFromPath(path);
           } else if (TELEMETRY_EXTS.has(ext)) {
             await setTelemetryFromPath(path);
+          } else if (LAYOUT_EXTS.has(ext)) {
+            await loadLayoutFromPath(path);
           }
         }
       });
@@ -50,7 +54,7 @@ export function useDragDrop(): { isDragOver: boolean } {
     return () => {
       unsubscribes.forEach((fn) => fn());
     };
-  }, [setVideoFromPath, setTelemetryFromPath]);
+  }, [setVideoFromPath, setTelemetryFromPath, loadLayoutFromPath]);
 
   return { isDragOver };
 }

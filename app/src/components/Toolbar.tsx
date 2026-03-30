@@ -1,4 +1,4 @@
-import { useRef, useEffect } from 'react';
+import { useRef, useEffect, useCallback } from 'react';
 import { useStore } from '../store/useStore';
 import type { ExportResolution, ExportEncoder, ExportBitrate } from '../store/useStore';
 import logo from '../assets/logo.png';
@@ -79,6 +79,10 @@ export default function Toolbar() {
     setCropVertical,
     setTrimStart,
     setTrimEnd,
+    saveLayout,
+    loadLayout,
+    layoutMessage,
+    clearLayoutMessage,
   } = useStore();
 
   const canExport = !!videoPath && !!telemetryPath && frames.length > 0 && !isExporting;
@@ -88,6 +92,13 @@ export default function Toolbar() {
   useEffect(() => {
     if (isExporting) exportStartRef.current = Date.now();
   }, [isExporting]);
+
+  const stableClearLayoutMessage = useCallback(clearLayoutMessage, [clearLayoutMessage]);
+  useEffect(() => {
+    if (!layoutMessage) return;
+    const t = setTimeout(stableClearLayoutMessage, 4000);
+    return () => clearTimeout(t);
+  }, [layoutMessage, stableClearLayoutMessage]);
 
   let progressPct = 0;
   let etaText = '';
@@ -112,6 +123,18 @@ export default function Toolbar() {
       <button className="btn" onClick={() => void importTelemetry()} disabled={isProcessing}>
         {telemetryPath ? '↺ Telemetry' : '+ Telemetry'}
       </button>
+
+      <div className="toolbar-sep" />
+
+      <button className="btn" onClick={() => void saveLayout()} disabled={isExporting}>
+        ⬇ Save Layout
+      </button>
+      <button className="btn" onClick={() => void loadLayout()} disabled={isExporting}>
+        ⬆ Load Layout
+      </button>
+      {layoutMessage && (
+        <span style={{ fontSize: 11, color: '#888' }}>{layoutMessage}</span>
+      )}
 
       <div className="toolbar-sep" />
 

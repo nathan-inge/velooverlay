@@ -10,6 +10,7 @@ import type {
   WidgetInstance,
 } from '../types';
 import type { StartMessage } from '../export/ExportWorker';
+import { WIDGET_REGISTRY } from '../export/widgetRegistry';
 
 const DEFAULT_LAYOUT: Layout = {
   schema_version: '1',
@@ -24,6 +25,7 @@ const DEFAULT_LAYOUT: Layout = {
 const VIDEO_FILTERS = [{ name: 'Video', extensions: ['mp4', 'mov'] }];
 const TELEMETRY_FILTERS = [{ name: 'Telemetry', extensions: ['fit', 'gpx', 'tcx'] }];
 const VIDEO_OUTPUT_FILTERS = [{ name: 'Video', extensions: ['mp4'] }];
+const LAYOUT_FILTERS = [{ name: 'Layout', extensions: ['json'] }];
 
 export type ExportResolution = 'source' | '1080p' | '1440p' | '4k';
 export type ExportEncoder   = 'balanced' | 'fast' | 'hardware';
@@ -86,6 +88,7 @@ interface AppState {
   verticalOffsetY: number;
   isSyncing: boolean;
   syncMessage: string | null;
+  layoutMessage: string | null;
 
   // Actions
   init: () => Promise<void>;
@@ -117,9 +120,74 @@ interface AppState {
   selectWidget: (id: string | null) => void;
   updateWidgetConfig: (id: string, patch: Record<string, unknown>) => void;
   updateTheme: (patch: Partial<Layout['theme']>) => void;
+  // Layout file I/O
+  saveLayout: () => Promise<void>;
+  loadLayout: () => Promise<void>;
+  loadLayoutFromPath: (path: string) => Promise<void>;
+  clearLayoutMessage: () => void;
   // Export
   exportVideo: () => Promise<void>;
   cancelExport: () => void;
+}
+
+function validateAndNormalizeLayout(
+  raw: unknown,
+  knownTypes: Set<string>,
+): { layout: Layout; skippedTypes: string[] } {
+  if (typeof raw !== 'object' || raw === null) {
+    throw new Error('Not a JSON object');
+  }
+  const obj = raw as Record<string, unknown>;
+
+  const version = obj['schema_version'];
+  if (version !== '1' && version !== '1.0.0') {
+    throw new Error(`Unsupported schema_version: ${String(version)}`);
+  }
+
+  const theme = obj['theme'];
+  if (typeof theme !== 'object' || theme === null) {
+    throw new Error('Missing or invalid theme');
+  }
+  const t = theme as Record<string, unknown>;
+  if (typeof t['fontFamily'] !== 'string' || typeof t['primaryColor'] !== 'string' || typeof t['backgroundOpacity'] !== 'number') {
+    throw new Error('Invalid theme fields');
+  }
+
+  if (!Array.isArray(obj['widgets'])) {
+    throw new Error('Missing widgets array');
+  }
+
+  const skippedTypes: string[] = [];
+  const widgets: WidgetInstance[] = [];
+
+  for (const w of obj['widgets'] as unknown[]) {
+    if (typeof w !== 'object' || w === null) continue;
+    const widget = w as Record<string, unknown>;
+    if (
+      typeof widget['id'] !== 'string' ||
+      typeof widget['type'] !== 'string' ||
+      typeof widget['version'] !== 'string' ||
+      typeof widget['position'] !== 'object' ||
+      typeof widget['size'] !== 'object' ||
+      typeof widget['config'] !== 'object'
+    ) {
+      throw new Error('Widget entry missing required fields');
+    }
+    if (!knownTypes.has(widget['type'] as string)) {
+      if (!skippedTypes.includes(widget['type'] as string)) {
+        skippedTypes.push(widget['type'] as string);
+      }
+      continue;
+    }
+    widgets.push(widget as unknown as WidgetInstance);
+  }
+
+  const layout: Layout = {
+    schema_version: '1',
+    theme: t as unknown as Layout['theme'],
+    widgets,
+  };
+  return { layout, skippedTypes };
 }
 
 export const useStore = create<AppState>((set, get) => ({
@@ -149,6 +217,7 @@ export const useStore = create<AppState>((set, get) => ({
   verticalOffsetY: 0,
   isSyncing: false,
   syncMessage: null,
+  layoutMessage: null,
 
   init: async () => {
     const ok = await invoke<boolean>('check_ffmpeg');
@@ -295,6 +364,61 @@ export const useStore = create<AppState>((set, get) => ({
     const { layout } = get();
     set({ layout: { ...layout, theme: { ...layout.theme, ...patch } } });
   },
+
+  // ── Layout file I/O ─────────────────────────────────────────────
+  saveLayout: async () => {
+    const { layout } = get();
+    const path = await save({ filters: LAYOUT_FILTERS, defaultPath: 'layout.json' });
+    if (!path) return;
+    const content = JSON.stringify(
+      { schema_version: layout.schema_version, theme: layout.theme, widgets: layout.widgets },
+      null,
+      2,
+    );
+    try {
+      await invoke('save_layout_file', { path, content });
+      set({ layoutMessage: 'Layout saved.' });
+    } catch (e) {
+      set({ layoutMessage: `Could not save layout: ${String(e)}` });
+    }
+  },
+
+  loadLayout: async () => {
+    const result = await open({ filters: LAYOUT_FILTERS, multiple: false });
+    if (!result || typeof result !== 'string') return;
+    await get().loadLayoutFromPath(result as string);
+  },
+
+  loadLayoutFromPath: async (path) => {
+    let content: string;
+    try {
+      content = await invoke<string>('read_layout_file', { path });
+    } catch (e) {
+      set({ layoutMessage: `Could not read layout: ${String(e)}` });
+      return;
+    }
+    let raw: unknown;
+    try {
+      raw = JSON.parse(content);
+    } catch {
+      set({ layoutMessage: 'Invalid layout: file is not valid JSON.' });
+      return;
+    }
+    try {
+      const { layout: newLayout, skippedTypes } = validateAndNormalizeLayout(
+        raw,
+        new Set(Object.keys(WIDGET_REGISTRY)),
+      );
+      const msg = skippedTypes.length > 0
+        ? `Layout loaded. Skipped unknown type(s): ${skippedTypes.join(', ')}`
+        : 'Layout loaded.';
+      set({ layout: newLayout, selectedWidgetId: null, layoutMessage: msg });
+    } catch (e) {
+      set({ layoutMessage: `Invalid layout: ${String(e)}` });
+    }
+  },
+
+  clearLayoutMessage: () => set({ layoutMessage: null }),
 
   setExportResolution: (r) => set({ exportResolution: r }),
   setExportEncoder: (e) => set({ exportEncoder: e }),

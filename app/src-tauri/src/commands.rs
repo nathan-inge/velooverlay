@@ -294,3 +294,15 @@ pub fn abort_export(
 ) {
     crate::render::abort_export(&session_id, &state);
 }
+
+/// Write a layout JSON file to the given path (path comes from a native save dialog).
+#[tauri::command]
+pub fn save_layout_file(path: String, content: String) -> Result<(), String> {
+    std::fs::write(&path, content).map_err(|e| format!("Could not write layout: {e}"))
+}
+
+/// Read a layout JSON file from the given path (path comes from a native open dialog).
+#[tauri::command]
+pub fn read_layout_file(path: String) -> Result<String, String> {
+    std::fs::read_to_string(&path).map_err(|e| format!("Could not read layout: {e}"))
+}
