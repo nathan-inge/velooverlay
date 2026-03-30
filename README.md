@@ -185,8 +185,10 @@ cargo tauri build
 1. **Import Video** — choose an MP4 or MOV from your camera.
 2. **Import Telemetry** — choose a `.fit`, `.gpx`, or `.tcx` activity file.
 3. **Sync** — the app auto-syncs using embedded timestamps if available. Use the offset slider for manual adjustment.
-4. **Add widgets** — drag widgets from the sidebar onto the stage and resize/reposition them.
-5. **Export MP4** — renders the overlay and re-encodes the video via FFmpeg. A progress counter shows frames rendered; click **Cancel** to abort at any time.
+4. **Crop** — optionally trim the vertical extent of the video before laying out widgets.
+5. **Add widgets** — drag widgets from the sidebar onto the stage and resize/reposition them.
+6. **Save / load layouts** — save your widget arrangement to a `.json` file and reload it for future rides.
+7. **Export MP4** — set the output resolution, choose software or hardware-accelerated encoding, then export. A progress bar with time estimate is shown; click **Cancel** to abort at any time.
 
 ### Widgets
 
@@ -195,9 +197,11 @@ All built-in widgets work in both the live preview and the exported video:
 | Widget | Type ID | Config options |
 |---|---|---|
 | Speedometer | `builtin:speedometer` | `unit`: `"kph"` or `"mph"` (default: `"kph"`) |
+| Analog Speedometer | `builtin:analog-speedometer` | `unit`: `"kph"` or `"mph"`, `showBoth`: show secondary unit (default: `false`), `maxSpeed`: dial max (default: `60`), `arcDegrees`: arc sweep 60–350° (default: `220`), `radiusScale`: dial size % (default: `92`) |
 | Heart Rate | `builtin:heart-rate` | — |
 | Cadence | `builtin:cadence` | — |
 | Power | `builtin:power` | — |
+| Power Meter | `builtin:power-meter` | `maxPower`: bar scale in Watts (default: `600`), `zones`: array of `{ upToWatts, color }` zone definitions |
 | Elevation | `builtin:elevation` | `unit`: `"m"` or `"ft"` (default: `"m"`) |
 | Gradient | `builtin:gradient` | `windowM`: smoothing window in metres (default: `200`) |
 | Snake Map | `builtin:snake-map` | `fullTrack`: `true` shows the full activity route (default: `false`) |
