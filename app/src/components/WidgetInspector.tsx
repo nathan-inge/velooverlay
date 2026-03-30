@@ -123,6 +123,77 @@ export default function WidgetInspector({ instance }: Props) {
           </div>
         );
 
+      case 'builtin:power-meter': {
+        type PowerZone = { upToWatts: number; color: string };
+        const rawZones = cfg.zones as PowerZone[] | undefined;
+        const zones: PowerZone[] = Array.isArray(rawZones) ? rawZones : [];
+        const maxPower = (cfg.maxPower as number) ?? 600;
+
+        const patchZone = (i: number, update: Partial<PowerZone>) => {
+          const next = zones.map((z, j) => (j === i ? { ...z, ...update } : z));
+          patch({ zones: next });
+        };
+
+        const removeZone = (i: number) => {
+          patch({ zones: zones.filter((_, j) => j !== i) });
+        };
+
+        const addZone = () => {
+          const lastWatts = zones.length > 0 ? zones[zones.length - 1].upToWatts : 0;
+          patch({ zones: [...zones, { upToWatts: lastWatts + 50, color: '#ffffff' }] });
+        };
+
+        return (
+          <>
+            <div className="inspector-field">
+              <div className="inspector-field-label">Max Power (W)</div>
+              <input
+                type="number"
+                className="inspector-input"
+                min={100}
+                max={2000}
+                step={50}
+                value={maxPower}
+                onChange={(e) => patch({ maxPower: Number(e.target.value) })}
+              />
+            </div>
+            <div className="inspector-field" style={{ flexDirection: 'column', alignItems: 'stretch', gap: 4 }}>
+              <div className="inspector-field-label">Power Zones</div>
+              {zones.map((zone, i) => (
+                <div key={i} style={{ display: 'flex', gap: 4, alignItems: 'center' }}>
+                  <span style={{ fontSize: 10, color: '#666', minWidth: 18 }}>Z{i + 1}</span>
+                  <input
+                    type="number"
+                    className="inspector-input"
+                    style={{ flex: 1, minWidth: 0 }}
+                    min={1}
+                    max={2000}
+                    step={10}
+                    value={zone.upToWatts}
+                    onChange={(e) => patchZone(i, { upToWatts: Number(e.target.value) })}
+                  />
+                  <span style={{ fontSize: 10, color: '#666' }}>W</span>
+                  <input
+                    type="color"
+                    value={zone.color}
+                    style={{ width: 26, height: 22, border: 'none', cursor: 'pointer', padding: 0, background: 'none' }}
+                    onChange={(e) => patchZone(i, { color: e.target.value })}
+                  />
+                  {zones.length > 1 && (
+                    <button className="btn small danger" onClick={() => removeZone(i)}>
+                      ✕
+                    </button>
+                  )}
+                </div>
+              ))}
+              <button className="btn small" style={{ marginTop: 2 }} onClick={addZone}>
+                + Add Zone
+              </button>
+            </div>
+          </>
+        );
+      }
+
       default:
         return <div className="inspector-empty">No settings for this widget.</div>;
     }

@@ -6,3 +6,5 @@ export { CadenceWidget } from './metric-tile-cadence';
 export { PowerWidget } from './metric-tile-power';
 export { ElevationWidget } from './metric-tile-elevation';
 export { GradientWidget } from './metric-tile-gradient';
+export { PowerMeterBarWidget } from './power-meter-bar';
+export type { PowerMeterConfig, PowerZone } from './power-meter-bar';

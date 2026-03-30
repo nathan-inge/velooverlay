@@ -51,6 +51,22 @@ const CATALOG: WidgetCatalogEntry[] = [
     defaultSize: { width: 140, height: 80 },
     defaultConfig: { windowM: 100 },
   },
+  {
+    type: 'builtin:power-meter',
+    name: 'Power Meter',
+    defaultSize: { width: 380, height: 80 },
+    defaultConfig: {
+      maxPower: 600,
+      zones: [
+        { upToWatts: 150, color: '#888899' },
+        { upToWatts: 220, color: '#4a9eff' },
+        { upToWatts: 290, color: '#40c97a' },
+        { upToWatts: 360, color: '#ffd93d' },
+        { upToWatts: 440, color: '#ff9944' },
+        { upToWatts: 600, color: '#ff4444' },
+      ],
+    },
+  },
 ];
 
 export default function WidgetPanel() {
