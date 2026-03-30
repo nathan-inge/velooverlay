@@ -9,6 +9,7 @@ import {
   ElevationWidget,
   GradientWidget,
   PowerMeterBarWidget,
+  AnalogSpeedometerWidget,
 } from '@velooverlay/widgets-builtin';
 
 export const WIDGET_REGISTRY: Record<string, WidgetDefinition> = {
@@ -21,4 +22,5 @@ export const WIDGET_REGISTRY: Record<string, WidgetDefinition> = {
   'builtin:elevation': ElevationWidget,
   'builtin:gradient': GradientWidget,
   'builtin:power-meter': PowerMeterBarWidget,
+  'builtin:analog-speedometer': AnalogSpeedometerWidget,
 };

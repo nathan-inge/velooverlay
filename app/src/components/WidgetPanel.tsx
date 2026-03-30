@@ -52,6 +52,12 @@ const CATALOG: WidgetCatalogEntry[] = [
     defaultConfig: { windowM: 100 },
   },
   {
+    type: 'builtin:analog-speedometer',
+    name: 'Analog Speedometer',
+    defaultSize: { width: 220, height: 185 },
+    defaultConfig: { unit: 'kph', showBoth: false, maxSpeed: 60, arcDegrees: 220, radiusScale: 92 },
+  },
+  {
     type: 'builtin:power-meter',
     name: 'Power Meter',
     defaultSize: { width: 380, height: 80 },

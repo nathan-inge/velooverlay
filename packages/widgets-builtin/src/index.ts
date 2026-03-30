@@ -8,3 +8,5 @@ export { ElevationWidget } from './metric-tile-elevation';
 export { GradientWidget } from './metric-tile-gradient';
 export { PowerMeterBarWidget } from './power-meter-bar';
 export type { PowerMeterConfig, PowerZone } from './power-meter-bar';
+export { AnalogSpeedometerWidget } from './analog-speedometer';
+export type { AnalogSpeedometerConfig } from './analog-speedometer';

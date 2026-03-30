@@ -123,6 +123,73 @@ export default function WidgetInspector({ instance }: Props) {
           </div>
         );
 
+      case 'builtin:analog-speedometer':
+        return (
+          <>
+            <div className="inspector-field">
+              <div className="inspector-field-label">Unit</div>
+              <div className="seg-ctrl">
+                <button
+                  className={`btn small${cfg.unit === 'kph' ? ' primary' : ''}`}
+                  onClick={() => patch({ unit: 'kph' })}
+                >
+                  KPH
+                </button>
+                <button
+                  className={`btn small${cfg.unit === 'mph' ? ' primary' : ''}`}
+                  onClick={() => patch({ unit: 'mph' })}
+                >
+                  MPH
+                </button>
+              </div>
+            </div>
+            <div className="inspector-field">
+              <div className="inspector-field-label">Max Speed</div>
+              <input
+                type="number"
+                className="inspector-input"
+                min={10}
+                max={500}
+                step={cfg.unit === 'mph' ? 5 : 10}
+                value={(cfg.maxSpeed as number) ?? 60}
+                onChange={(e) => patch({ maxSpeed: Number(e.target.value) })}
+              />
+            </div>
+            <div className="inspector-field">
+              <div className="inspector-field-label">Arc (°)</div>
+              <input
+                type="number"
+                className="inspector-input"
+                min={60}
+                max={350}
+                step={5}
+                value={(cfg.arcDegrees as number) ?? 220}
+                onChange={(e) => patch({ arcDegrees: Number(e.target.value) })}
+              />
+            </div>
+            <div className="inspector-field">
+              <div className="inspector-field-label">Radius (%)</div>
+              <input
+                type="number"
+                className="inspector-input"
+                min={20}
+                max={100}
+                step={5}
+                value={(cfg.radiusScale as number) ?? 92}
+                onChange={(e) => patch({ radiusScale: Number(e.target.value) })}
+              />
+            </div>
+            <div className="inspector-field">
+              <div className="inspector-field-label">Show Both Units</div>
+              <input
+                type="checkbox"
+                checked={(cfg.showBoth as boolean) ?? false}
+                onChange={(e) => patch({ showBoth: e.target.checked })}
+              />
+            </div>
+          </>
+        );
+
       case 'builtin:power-meter': {
         type PowerZone = { upToWatts: number; color: string };
         const rawZones = cfg.zones as PowerZone[] | undefined;
